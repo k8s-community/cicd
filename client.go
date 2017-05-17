@@ -2,7 +2,6 @@ package cicd
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/k8s-community/cicd/utils/rest"
@@ -24,10 +23,9 @@ func NewClient(baseURL string) *Client {
 	}
 }
 
-// Build runs CICD-build. Please, see an Example.
+// Build runs CICD-build. Please, see an ExampleBuild.
 func (c *Client) Build(request *BuildRequest) (*BuildResponse, error) {
-	url := fmt.Sprintf(buildURL)
-	req, err := c.client.NewRequest("POST", url, request)
+	req, err := c.client.NewRequest("POST", buildURL, request)
 	if err != nil {
 		return nil, err
 	}

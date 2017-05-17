@@ -3,7 +3,7 @@ package cicd
 // Error is a common error typical for all responses
 type Error struct {
 	Code    string `json:"code"`
-	Message string
+	Message string `json:"message"`
 }
 
 // BuildRequest defines request body of Build API method

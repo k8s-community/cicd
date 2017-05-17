@@ -1,2 +1,9 @@
 # cicd
-The simplest CI/CD service to make builds and deliver them to Helm
+
+The simplest CI/CD service to `make test` and `make build`.
+
+## How to run
+
+Only to try!
+
+    env SERVICE_HOST=0.0.0.0 SERVICE_PORT=8080 go run ./service/cicd.go

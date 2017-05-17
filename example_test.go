@@ -6,7 +6,7 @@ import (
 	"github.com/k8s-community/cicd"
 )
 
-func Example() {
+func ExampleBuild() {
 	client := cicd.NewClient("http://127.0.0.1:8080")
 
 	request := &cicd.BuildRequest{

@@ -26,6 +26,7 @@ func NewBuild(log logrus.FieldLogger) *Build {
 func (b *Build) Run(c *router.Control) {
 	requestID := uuid.NewV4().String()
 	b.log = b.log.WithField("requestID", requestID)
+	b.log.Infof("Processing request...")
 
 	req := new(cicd.BuildRequest)
 	err := json.NewDecoder(c.Request.Body).Decode(&req)
@@ -41,6 +42,7 @@ func (b *Build) Run(c *router.Control) {
 	}
 
 	// TODO: manage amount of goroutines!
+	// TODO: add max execution time of goroutine!!!! If processing is too slow, we need to stop it
 	go b.processBuild(req)
 
 	data := &cicd.Build{RequestID: requestID}

@@ -39,7 +39,7 @@ func main() {
 
 	r := router.New()
 
-	r.GET("/api/v1/build", buildHandler.Run)
+	r.POST("/api/v1/build", buildHandler.Run)
 
 	r.GET("/info", func(c *router.Control) {
 		common_handlers.Info(c, version.RELEASE, version.REPO, version.COMMIT)
