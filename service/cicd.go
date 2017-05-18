@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/k8s-community/cicd/handlers"
 	"github.com/k8s-community/cicd/version"
 	common_handlers "github.com/k8s-community/handlers"
+	"github.com/takama/daemon"
 	"github.com/takama/router"
 )
 
@@ -16,6 +19,11 @@ func main() {
 	log := logrus.New()
 	log.Formatter = new(logrus.TextFormatter)
 	logger := log.WithFields(logrus.Fields{"service": "cicd"})
+
+	status, err := daemonCommands()
+	if err != nil {
+		logger.Fatalf("%s: %s", status, err)
+	}
 
 	var errors []error
 
@@ -50,7 +58,56 @@ func main() {
 
 	hostPort := fmt.Sprintf("%s:%s", serviceHost, servicePort)
 	logger.Infof("Ready to listen %s. Routes: %+v", hostPort, r.Routes())
-	r.Listen(hostPort)
+	go r.Listen(hostPort)
+
+	// Set up channel on which to send signal notifications.
+	// We must use a buffered channel or risk missing the signal
+	// if we're not ready to receive when the signal is sent.
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt, os.Kill, syscall.SIGTERM)
+	killSignal := <-interrupt
+	logger.Infof("Got signal: %s", killSignal)
+	status, err = shutdown()
+	if err != nil {
+		logger.Fatalf("Error: %s Status: %s\n", err.Error(), status)
+	}
+	if killSignal == os.Kill {
+		logger.Infof("Service was killed")
+	} else {
+		logger.Infof("Service was terminated by system signal")
+	}
+	logger.Infof(status)
+}
+
+func shutdown() (string, error) {
+	return "Shutdown", nil
+}
+
+func daemonCommands() (string, error) {
+
+	svc, err := daemon.New("cicd", "Simplest CI/CD service")
+	if err != nil {
+		return "Couldn't init daemon", err
+	}
+
+	// if received any kind of command, do it
+	if len(os.Args) > 1 {
+		command := os.Args[1]
+		switch command {
+		case "install":
+			return svc.Install(os.Args[2:]...)
+		case "remove":
+			return svc.Remove()
+		case "start":
+			return svc.Start()
+		case "stop":
+			return svc.Stop()
+		case "status":
+			return svc.Status()
+		}
+	}
+
+	return "Ok", nil
 }
 
 func getFromEnv(name string) (string, error) {
