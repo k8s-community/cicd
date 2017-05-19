@@ -43,10 +43,15 @@ func main() {
 	}
 	flag.Parse()
 
-	serviceHost := cfg.SERVICE.Host
-	servicePort := strconv.Itoa(cfg.SERVICE.Port)
+	serviceHost, err := getFromEnv("SERVICE_HOST")
+	if err != nil {
+		serviceHost = cfg.SERVICE.Host
+	}
 
-	logger.Println(cfg)
+	servicePort, err := getFromEnv("SERVICE_PORT")
+	if err != nil {
+		servicePort = strconv.Itoa(cfg.SERVICE.Port)
+	}
 
 	status, err := daemonCommands()
 	if err != nil {
