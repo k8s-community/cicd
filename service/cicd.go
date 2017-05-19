@@ -1,44 +1,64 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/k8s-community/cicd/handlers"
 	"github.com/k8s-community/cicd/version"
 	common_handlers "github.com/k8s-community/handlers"
+	"github.com/octago/sflags/gen/gflag"
 	"github.com/takama/daemon"
 	"github.com/takama/router"
 )
+
+type HttpConfig struct {
+	Host string `env:"SERVICE_HOST"`
+	Port int    `env:"SERVICE_PORT"`
+}
+
+type Config struct {
+	SERVICE HttpConfig
+}
 
 func main() {
 	log := logrus.New()
 	log.Formatter = new(logrus.TextFormatter)
 	logger := log.WithFields(logrus.Fields{"service": "cicd"})
+	cfg := &Config{
+		SERVICE: HttpConfig{
+			Host: "0.0.0.0",
+			Port: 8080,
+		},
+	}
+	err := gflag.ParseToDef(cfg)
+	if err != nil {
+		logger.Fatalf("err: %v", err)
+	}
+	flag.Parse()
+
+	serviceHost, err := getFromEnv("SERVICE_HOST")
+	if err != nil {
+		serviceHost = cfg.SERVICE.Host
+	}
+
+	servicePort, err := getFromEnv("SERVICE_PORT")
+	if err != nil {
+		servicePort = strconv.Itoa(cfg.SERVICE.Port)
+	}
 
 	status, err := daemonCommands()
 	if err != nil {
 		logger.Fatalf("%s: %s", status, err)
 	}
-
-	var errors []error
-
-	serviceHost, err := getFromEnv("SERVICE_HOST")
-	if err != nil {
-		errors = append(errors, err)
-	}
-
-	servicePort, err := getFromEnv("SERVICE_PORT")
-	if err != nil {
-		errors = append(errors, err)
-	}
-
-	if len(errors) > 0 {
-		logger.Fatalf("Couldn't start service because required parameters are not set: %+v", errors)
+	if status != "ok" {
+		os.Exit(0)
 	}
 
 	// TODO: add graceful shutdown
@@ -107,7 +127,7 @@ func daemonCommands() (string, error) {
 		}
 	}
 
-	return "Ok", nil
+	return "ok", nil
 }
 
 func getFromEnv(name string) (string, error) {

@@ -2,7 +2,7 @@ package cicd
 
 // Error is a common error typical for all responses
 type Error struct {
-	Code    string `json:"code"`
+	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
