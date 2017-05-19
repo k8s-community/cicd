@@ -9,7 +9,7 @@ import (
 
 var (
 	fPrefix = flag.String("prefix", "github.com", "Source code storage (to deal with 'go get')")
-	fUser   = flag.String("user", "k8s-community", "Username (part of path to repo)")
+	fUser   = flag.String("user", "rumyantseva", "Username (part of path to repo)")
 	fRepo   = flag.String("repo", "myapp", "Repository name")
 	fCommit = flag.String("commit", "develop", "Commit hash or branch name")
 )

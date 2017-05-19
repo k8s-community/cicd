@@ -19,8 +19,15 @@ func Process(log logrus.FieldLogger, prefix, user, repo, commit string) (string,
 	url := fmt.Sprintf("%s/%s/%s", prefix, user, repo)
 	dir := fmt.Sprintf("%s/src/%s", gopath, url)
 
+	// Move to gopath, always start from the same point
+	err := os.Chdir(gopath)
+	if err != nil {
+		logger.Errorf("Couldn't change directory: %s", err)
+		return "", err
+	}
+
 	logger.Infof("Remove dir %s", dir)
-	err := os.RemoveAll(dir)
+	err = os.RemoveAll(dir)
 	if err != nil {
 		logger.Errorf("Couldn't remove directory %s: %s", dir, err)
 		return "", err
@@ -31,23 +38,17 @@ func Process(log logrus.FieldLogger, prefix, user, repo, commit string) (string,
 		return out, err
 	}
 
-	err = os.Chdir(dir)
-	if err != nil {
-		logger.Errorf("Couldn't change directory: %s", err)
-		return "", err
-	}
-
-	out, err = runCommand(logger, []string{}, "git", "checkout", commit)
+	out, err = runCommand(logger, []string{}, "cd", dir, "&&", "git", "checkout", commit)
 	if err != nil {
 		return out, err
 	}
 
-	out, err = runCommand(logger, []string{}, "make", "test")
+	out, err = runCommand(logger, []string{}, "cd", dir, "&&", "make", "test")
 	if err != nil {
 		return out, err
 	}
 
-	out, err = runCommand(logger, []string{"NAMESPACE=" + user}, "make", "deploy")
+	out, err = runCommand(logger, []string{"NAMESPACE=" + user}, "cd", dir, "&&", "make", "deploy")
 	if err != nil {
 		return out, err
 	}
