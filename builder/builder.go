@@ -14,8 +14,11 @@ import (
 func Process(log logrus.FieldLogger, prefix, user, repo, commit string) (string, error) {
 	logger := log.WithFields(logrus.Fields{"source": prefix, "user": user, "repo": repo, "commit": commit})
 
+	// TODO: it's good to use something like build.Default.GOPATH, but it doesn't work with daemon
+	gopath := os.Getenv("GOPATH")
+
 	url := fmt.Sprintf("%s/%s/%s", prefix, user, repo)
-	dir := fmt.Sprintf("%s/src/%s", build.Default.GOPATH, url)
+	dir := fmt.Sprintf("%s/src/%s", gopath, url)
 
 	out, err := runCommand(logger, []string{}, "go", "get", "-u", url)
 	if err != nil {
