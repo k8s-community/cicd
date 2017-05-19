@@ -55,7 +55,7 @@ func (b *Build) Run(c *router.Control) {
 }
 
 func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
-	out, err := builder.Process(b.log, "github.com", req.Username, req.Repository, req.CommitHash)
+	_, err := builder.Process(b.log, "github.com", req.Username, req.Repository, req.CommitHash)
 
 	var state string
 	var description string
@@ -63,7 +63,7 @@ func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 	// TODO: send result of processing to integration service!
 	if err != nil {
 		state = ghIntegr.StateFailure
-		description = fmt.Sprintf("Build failed: %s. End of output is %s", err.Error(), out)
+		description = fmt.Sprintf("Build failed: %s. Please, read logs for request %s", err.Error(), requestID)
 	} else {
 		state = ghIntegr.StateSuccess
 		description = "The service was released"
@@ -76,7 +76,7 @@ func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 		State:       state,
 		BuildURL:    "https://k8s.community", // TODO: fix it!
 		Description: description,
-		Context:     requestID, // TODO: fix it!
+		Context:     "k8s-community/cicd", // TODO: fix it!
 	}
 	err = b.githubIntegrationClient.Build.BuildCallback(callbackData)
 
