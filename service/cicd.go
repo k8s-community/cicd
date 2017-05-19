@@ -31,6 +31,10 @@ type Config struct {
 }
 
 func main() {
+	// Это какой-то странный костыль, который предложил задать Игорь :(
+	os.Setenv("GOPATH", "/root/gocode")
+	os.Setenv("PATH", "$PATH:/usr/bin:/usr/local/bin:/usr/local/go/bin:/root/gocode/bin")
+
 	log := logrus.New()
 	log.Formatter = new(logrus.TextFormatter)
 	logger := log.WithFields(logrus.Fields{"service": "cicd"})
