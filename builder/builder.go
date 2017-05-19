@@ -2,7 +2,6 @@ package builder
 
 import (
 	"fmt"
-	"go/build"
 	"os"
 	"os/exec"
 	"strings"
