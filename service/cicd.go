@@ -19,13 +19,15 @@ import (
 	"github.com/takama/router"
 )
 
-type HttpConfig struct {
+// HTTPConfig ...
+type HTTPConfig struct {
 	Host string `env:"SERVICE_HOST"`
 	Port int    `env:"SERVICE_PORT"`
 }
 
+// Config ...
 type Config struct {
-	SERVICE HttpConfig
+	SERVICE HTTPConfig
 }
 
 func main() {
@@ -33,7 +35,7 @@ func main() {
 	log.Formatter = new(logrus.TextFormatter)
 	logger := log.WithFields(logrus.Fields{"service": "cicd"})
 	cfg := &Config{
-		SERVICE: HttpConfig{
+		SERVICE: HTTPConfig{
 			Host: "0.0.0.0",
 			Port: 8080,
 		},
@@ -59,7 +61,7 @@ func main() {
 		logger.Fatalf("%s: %s", status, err)
 	}
 	if status != "ok" {
-		logger.Fatal("Couldn't deal with daemon")
+		os.Exit(0)
 	}
 
 	ghIntBaseURL, err := getFromEnv("GITHUBINT_BASE_URL")
