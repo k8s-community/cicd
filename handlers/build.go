@@ -47,14 +47,14 @@ func (b *Build) Run(c *router.Control) {
 
 	// TODO: manage amount of goroutines!
 	// TODO: add max execution time of goroutine!!!! If processing is too slow, we need to stop it
-	go b.processBuild(req)
+	go b.processBuild(req, requestID)
 
 	data := &cicd.Build{RequestID: requestID}
 	response := cicd.BuildResponse{Data: data}
 	c.Code(http.StatusCreated).Body(response)
 }
 
-func (b *Build) processBuild(req *cicd.BuildRequest) {
+func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 	out, err := builder.Process(b.log, "github.com", req.Username, req.Repository, req.CommitHash)
 
 	var state string
@@ -66,6 +66,7 @@ func (b *Build) processBuild(req *cicd.BuildRequest) {
 		description = fmt.Sprintf("Build failed: %s. End of output is %s", err.Error(), out)
 	} else {
 		state = ghIntegr.StateSuccess
+		description = "The service was released"
 	}
 
 	callbackData := ghIntegr.BuildCallback{
@@ -75,7 +76,7 @@ func (b *Build) processBuild(req *cicd.BuildRequest) {
 		State:       state,
 		BuildURL:    "https://k8s.community", // TODO: fix it!
 		Description: description,
-		Context:     "", // TODO: fix it!
+		Context:     requestID, // TODO: fix it!
 	}
 	err = b.githubIntegrationClient.Build.BuildCallback(callbackData)
 
