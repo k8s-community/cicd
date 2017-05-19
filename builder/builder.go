@@ -19,6 +19,12 @@ func Process(log logrus.FieldLogger, prefix, user, repo, commit string) (string,
 	url := fmt.Sprintf("%s/%s/%s", prefix, user, repo)
 	dir := fmt.Sprintf("%s/src/%s", gopath, url)
 
+	err := os.RemoveAll(dir)
+	if err != nil {
+		logger.Errorf("Couldn't remove directory %s: %s", dir, err)
+		return "", err
+	}
+
 	out, err := runCommand(logger, []string{}, "go", "get", "-u", url)
 	if err != nil {
 		return out, err
