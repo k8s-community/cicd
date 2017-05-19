@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/k8s-community/cicd"
 	"github.com/k8s-community/cicd/builder"
+	ghIntegr "github.com/k8s-community/github-integration/client"
 	"github.com/satori/go.uuid"
 	"github.com/takama/router"
 	"net/http"
@@ -12,13 +14,15 @@ import (
 
 // Build is a handler to process Build requests
 type Build struct {
-	log logrus.FieldLogger
+	log                     logrus.FieldLogger
+	githubIntegrationClient *ghIntegr.Client
 }
 
 // NewBuild returns an instance of Build
-func NewBuild(log logrus.FieldLogger) *Build {
+func NewBuild(log logrus.FieldLogger, ghIntClient *ghIntegr.Client) *Build {
 	return &Build{
 		log: log,
+		githubIntegrationClient: ghIntClient,
 	}
 }
 
@@ -51,10 +55,28 @@ func (b *Build) Run(c *router.Control) {
 }
 
 func (b *Build) processBuild(req *cicd.BuildRequest) {
-	err := builder.Process(b.log, "github.com", req.Username, req.Repository, req.CommitHash)
+	out, err := builder.Process(b.log, "github.com", req.Username, req.Repository, req.CommitHash)
+
+	var state string
+	var description string
 
 	// TODO: send result of processing to integration service!
 	if err != nil {
-
+		state = ghIntegr.StateFailure
+		description = fmt.Sprintf("Build failed: %s. End of output is %s", err.Error(), out)
+	} else {
+		state = ghIntegr.StateSuccess
 	}
+
+	callbackData := ghIntegr.BuildCallback{
+		Username:    req.Username,
+		Repository:  req.Repository,
+		CommitHash:  req.CommitHash,
+		State:       state,
+		BuildURL:    "https://k8s.community", // TODO: fix it!
+		Description: description,
+		Context:     "", // TODO: fix it!
+	}
+	err = b.githubIntegrationClient.Build.BuildCallback(callbackData)
+
 }

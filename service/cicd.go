@@ -12,6 +12,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/k8s-community/cicd/handlers"
 	"github.com/k8s-community/cicd/version"
+	ghIntegr "github.com/k8s-community/github-integration/client"
 	common_handlers "github.com/k8s-community/handlers"
 	"github.com/octago/sflags/gen/gflag"
 	"github.com/takama/daemon"
@@ -58,12 +59,22 @@ func main() {
 		logger.Fatalf("%s: %s", status, err)
 	}
 	if status != "ok" {
-		os.Exit(0)
+		logger.Fatal("Couldn't deal with daemon")
+	}
+
+	ghIntBaseURL, err := getFromEnv("GITHUBINT_BASE_URL")
+	if err != nil {
+		ghIntBaseURL = "https://services.k8s.community/github-integration" // todo: fix to flags
+	}
+
+	ghIntClient, err := ghIntegr.NewClient(nil, ghIntBaseURL)
+	if err != nil {
+		logger.Fatalf("Couldn't get an instance of github-integration's service client: %+v", err)
 	}
 
 	// TODO: add graceful shutdown
 
-	buildHandler := handlers.NewBuild(logger)
+	buildHandler := handlers.NewBuild(logger, ghIntClient)
 
 	r := router.New()
 

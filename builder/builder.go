@@ -11,42 +11,42 @@ import (
 )
 
 // Process do CICD work: go get of repo, git checkout to given commit, make test and make deploy
-func Process(log logrus.FieldLogger, prefix, user, repo, commit string) error {
+func Process(log logrus.FieldLogger, prefix, user, repo, commit string) (string, error) {
 	logger := log.WithFields(logrus.Fields{"source": prefix, "user": user, "repo": repo, "commit": commit})
 
 	url := fmt.Sprintf("%s/%s/%s", prefix, user, repo)
 	dir := fmt.Sprintf("%s/src/%s", build.Default.GOPATH, url)
 
-	err := runCommand(logger, []string{}, "go", "get", "-u", url)
+	out, err := runCommand(logger, []string{}, "go", "get", "-u", url)
 	if err != nil {
-		return err
+		return out, err
 	}
 
 	err = os.Chdir(dir)
 	if err != nil {
 		logger.Errorf("Couldn't change directory: %s", err)
-		return err
+		return "", err
 	}
 
-	err = runCommand(logger, []string{}, "git", "checkout", commit)
+	out, err = runCommand(logger, []string{}, "git", "checkout", commit)
 	if err != nil {
-		return err
+		return out, err
 	}
 
-	err = runCommand(logger, []string{}, "make", "test")
+	out, err = runCommand(logger, []string{}, "make", "test")
 	if err != nil {
-		return err
+		return out, err
 	}
 
-	err = runCommand(logger, []string{"NAMESPACE=" + user}, "make", "deploy")
+	out, err = runCommand(logger, []string{"NAMESPACE=" + user}, "make", "deploy")
 	if err != nil {
-		return err
+		return out, err
 	}
 
-	return nil
+	return out, nil
 }
 
-func runCommand(logger logrus.FieldLogger, env []string, name string, arg ...string) error {
+func runCommand(logger logrus.FieldLogger, env []string, name string, arg ...string) (string, error) {
 	logger = logger.WithFields(logrus.Fields{
 		"command":        name + " " + strings.Join(arg, " "),
 		"additional_env": strings.Join(env, " "),
@@ -59,16 +59,17 @@ func runCommand(logger logrus.FieldLogger, env []string, name string, arg ...str
 	command.Env = osEnv
 
 	out, err := command.CombinedOutput()
+	commandOut := string(out)
 
 	if len(out) > 0 {
-		logger.Info(string(out))
+		logger.Info(commandOut)
 	}
 
 	if err != nil {
 		logger.Errorf("Command failed: %s", err)
-		return err
+		return commandOut, err
 	}
 
 	logger.Infof("Done")
-	return nil
+	return commandOut, nil
 }
