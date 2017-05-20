@@ -3,13 +3,15 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/k8s-community/cicd"
 	"github.com/k8s-community/cicd/builder"
 	ghIntegr "github.com/k8s-community/github-integration/client"
 	"github.com/satori/go.uuid"
 	"github.com/takama/router"
-	"net/http"
 )
 
 // Build is a handler to process Build requests
@@ -70,7 +72,7 @@ func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 	}
 
 	callbackData := ghIntegr.BuildCallback{
-		Username:    req.Username,
+		Username:    strings.ToLower(req.Username),
 		Repository:  req.Repository,
 		CommitHash:  req.CommitHash,
 		State:       state,
