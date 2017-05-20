@@ -19,44 +19,43 @@ func Process(log logrus.FieldLogger, prefix, user, repo, commit string) (string,
 	url := fmt.Sprintf("%s/%s/%s", prefix, user, repo)
 	dir := fmt.Sprintf("%s/src/%s", gopath, url)
 
-	// Move to gopath, always start from the same point
-	err := os.Chdir(gopath)
-	if err != nil {
-		logger.Errorf("Couldn't change directory: %s", err)
-		return "", err
-	}
-
 	logger.Infof("Remove dir %s", dir)
-	err = os.RemoveAll(dir)
+	err := os.RemoveAll(dir)
 	if err != nil {
 		logger.Errorf("Couldn't remove directory %s: %s", dir, err)
 		return "", err
 	}
 
-	out, err := runCommand(logger, []string{}, "go", "get", "-u", url)
+	var output string
+
+	out, err := runCommand(logger, []string{}, gopath, "go", "get", "-u", url)
+	output += out
 	if err != nil {
 		return out, err
 	}
 
-	out, err = runCommand(logger, []string{}, "cd", dir, "&&", "git", "checkout", commit)
+	out, err = runCommand(logger, []string{}, dir, "git", "checkout", commit)
+	output += out
 	if err != nil {
 		return out, err
 	}
 
-	out, err = runCommand(logger, []string{}, "cd", dir, "&&", "make", "test")
+	out, err = runCommand(logger, []string{}, dir, "make", "test")
+	output += out
 	if err != nil {
 		return out, err
 	}
 
-	out, err = runCommand(logger, []string{"NAMESPACE=" + user}, "cd", dir, "&&", "make", "deploy")
+	out, err = runCommand(logger, []string{"NAMESPACE=" + user}, dir, "make", "deploy")
+	output += out
 	if err != nil {
 		return out, err
 	}
 
-	return out, nil
+	return output, nil
 }
 
-func runCommand(logger logrus.FieldLogger, env []string, name string, arg ...string) (string, error) {
+func runCommand(logger logrus.FieldLogger, env []string, dir, name string, arg ...string) (string, error) {
 	logger = logger.WithFields(logrus.Fields{
 		"command":        name + " " + strings.Join(arg, " "),
 		"additional_env": strings.Join(env, " "),
@@ -67,6 +66,7 @@ func runCommand(logger logrus.FieldLogger, env []string, name string, arg ...str
 
 	osEnv := append(os.Environ(), env...)
 	command.Env = osEnv
+	command.Dir = dir
 
 	out, err := command.CombinedOutput()
 	commandOut := string(out)
