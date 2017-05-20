@@ -73,7 +73,7 @@ func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 	}
 
 	callbackData := ghIntegr.BuildCallback{
-		Username:    namespace,
+		Username:    req.Username,
 		Repository:  req.Repository,
 		CommitHash:  req.CommitHash,
 		State:       state,
