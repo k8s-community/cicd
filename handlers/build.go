@@ -57,7 +57,8 @@ func (b *Build) Run(c *router.Control) {
 }
 
 func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
-	_, err := builder.Process(b.log, "github.com", req.Username, req.Repository, req.CommitHash)
+	namespace := strings.ToLower(req.Username)
+	_, err := builder.Process(b.log, "github.com", namespace, req.Repository, req.CommitHash)
 
 	var state string
 	var description string
@@ -72,7 +73,7 @@ func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 	}
 
 	callbackData := ghIntegr.BuildCallback{
-		Username:    strings.ToLower(req.Username),
+		Username:    namespace,
 		Repository:  req.Repository,
 		CommitHash:  req.CommitHash,
 		State:       state,
