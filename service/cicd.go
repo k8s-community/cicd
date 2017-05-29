@@ -19,6 +19,10 @@ import (
 	"github.com/takama/router"
 )
 
+const (
+	maxTasks = 20 // maximum of parallel CI/CD tasks
+)
+
 // HTTPConfig ...
 type HTTPConfig struct {
 	Host string `env:"SERVICE_HOST"`
