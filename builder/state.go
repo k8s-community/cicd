@@ -87,6 +87,7 @@ func NewState(processor Processor, logger logrus.FieldLogger, maxWorkers int) *S
 	return state
 }
 
+// GetTasks get Tasks to the pool.
 func (state *State) GetTasks() ([]string, []string) {
 	var queue []string
 	var current []string
