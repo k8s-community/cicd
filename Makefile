@@ -31,11 +31,17 @@ build: vendor
 		-ldflags "-s -w -X ${PROJECT}/version.RELEASE=${RELEASE} -X ${PROJECT}/version.COMMIT=${COMMIT} -X ${PROJECT}/version.REPO=${REPO_INFO}" \
 		-o ../${APP}
 
-install: build
+install: build stop remove
 	sudo ./${APP} install --service-host ${SERVICE_HOST} --service-port ${SERVICE_PORT}
 
-remove: build
+remove:
 	sudo ./${APP} remove
+
+stop:
+	sudo ./${APP} stop
+
+start:
+	sudo ./${APP} start
 
 fmt:
 	@echo "+ $@"
