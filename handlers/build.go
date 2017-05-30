@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -16,16 +15,33 @@ import (
 
 // Build is a handler to process Build requests
 type Build struct {
+	state                   *builder.State
 	log                     logrus.FieldLogger
 	githubIntegrationClient *ghIntegr.Client
 }
 
 // NewBuild returns an instance of Build
-func NewBuild(log logrus.FieldLogger, ghIntClient *ghIntegr.Client) *Build {
+func NewBuild(state *builder.State, log logrus.FieldLogger, ghIntClient *ghIntegr.Client) *Build {
 	return &Build{
-		log: log,
+		state: state,
+		log:   log,
 		githubIntegrationClient: ghIntClient,
 	}
+}
+
+// Status shows current tasks status
+func (b *Build) Status(c *router.Control) {
+	queue, current := b.state.GetTasks()
+
+	response := struct {
+		Queue   []string `json:"queue"`
+		Current []string `json:"current"`
+	}{
+		Queue:   queue,
+		Current: current,
+	}
+
+	c.Code(http.StatusOK).Body(response)
 }
 
 // Run handles build running
@@ -58,29 +74,25 @@ func (b *Build) Run(c *router.Control) {
 
 func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 	namespace := strings.ToLower(req.Username)
-	_, err := builder.Process(b.log, "github.com", namespace, req.Repository, req.CommitHash)
 
-	var state string
-	var description string
-
-	// TODO: send result of processing to integration service!
-	if err != nil {
-		state = ghIntegr.StateFailure
-		description = fmt.Sprintf("Build failed: %s. Please, read logs for request %s", err.Error(), requestID)
-	} else {
-		state = ghIntegr.StateSuccess
-		description = "The service was released"
+	callback := func(state string, description string) {
+		// TODO: send result of processing to integration service too!
+		callbackData := ghIntegr.BuildCallback{
+			Username:    req.Username,
+			Repository:  req.Repository,
+			CommitHash:  req.CommitHash,
+			State:       state,
+			BuildURL:    "https://k8s.community/" + requestID, // TODO: fix it!
+			Description: "task...",                            // TODO: less than 120 symbols
+			Context:     "k8s-community/cicd",                 // TODO: fix it!
+		}
+		err := b.githubIntegrationClient.Build.BuildCallback(callbackData)
+		if err != nil {
+			b.log.Error(err)
+		}
 	}
 
-	callbackData := ghIntegr.BuildCallback{
-		Username:    req.Username,
-		Repository:  req.Repository,
-		CommitHash:  req.CommitHash,
-		State:       state,
-		BuildURL:    "https://k8s.community", // TODO: fix it!
-		Description: description,
-		Context:     "k8s-community/cicd", // TODO: fix it!
-	}
-	err = b.githubIntegrationClient.Build.BuildCallback(callbackData)
-
+	// task types: test, build, release etc (instead of test)
+	b.state.AddTask(callback, requestID, "test", "github.com", namespace, req.Repository, req.CommitHash)
+	callback(ghIntegr.StatePending, "Task was queued")
 }

@@ -7,52 +7,58 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
+	ghIntegr "github.com/k8s-community/github-integration/client"
 )
 
 // Process do CICD work: go get of repo, git checkout to given commit, make test and make deploy
-func Process(log logrus.FieldLogger, prefix, user, repo, commit string) (string, error) {
-	logger := log.WithFields(logrus.Fields{"source": prefix, "user": user, "repo": repo, "commit": commit})
+func Process(log logrus.FieldLogger, task Task) {
+	logger := log.WithFields(logrus.Fields{"source": task.prefix, "user": task.user, "repo": task.repo, "commit": task.commit})
 
 	// TODO: it's good to use something like build.Default.GOPATH, but it doesn't work with daemon
 	gopath := os.Getenv("GOPATH")
 
-	url := fmt.Sprintf("%s/%s/%s", prefix, user, repo)
+	url := fmt.Sprintf("%s/%s/%s", task.prefix, task.user, task.repo)
 	dir := fmt.Sprintf("%s/src/%s", gopath, url)
 
 	logger.Infof("Remove dir %s", dir)
 	err := os.RemoveAll(dir)
+	processCommandResult(task.callback, "", err)
 	if err != nil {
 		logger.Errorf("Couldn't remove directory %s: %s", dir, err)
-		return "", err
+		return
 	}
 
 	var output string
 
 	out, err := runCommand(logger, []string{}, gopath, "go", "get", "-u", url)
 	output += out
+	processCommandResult(task.callback, output, err)
 	if err != nil {
-		return out, err
+		return
 	}
 
-	out, err = runCommand(logger, []string{}, dir, "git", "checkout", commit)
+	out, err = runCommand(logger, []string{}, dir, "git", "checkout", task.commit)
 	output += out
+	processCommandResult(task.callback, output, err)
 	if err != nil {
-		return out, err
+		return
 	}
 
 	out, err = runCommand(logger, []string{}, dir, "make", "test")
 	output += out
+	processCommandResult(task.callback, output, err)
 	if err != nil {
-		return out, err
+		return
 	}
 
-	out, err = runCommand(logger, []string{"NAMESPACE=" + user}, dir, "make", "deploy")
+	/*out, err = runCommand(logger, []string{"NAMESPACE=" + task.user}, dir, "make", "deploy")
 	output += out
+	processCommandResult(task.callback, output, err)
 	if err != nil {
-		return out, err
-	}
+		return
+	}*/
 
-	return output, nil
+	task.callback(ghIntegr.StateSuccess, output)
 }
 
 func runCommand(logger logrus.FieldLogger, env []string, dir, name string, arg ...string) (string, error) {
@@ -82,4 +88,12 @@ func runCommand(logger logrus.FieldLogger, env []string, dir, name string, arg .
 
 	logger.Infof("Done")
 	return commandOut, nil
+}
+
+func processCommandResult(callback Callback, output string, err error) {
+	if err != nil {
+		callback(ghIntegr.StateError, output+" \n\nError: "+err.Error())
+	} else {
+		callback(ghIntegr.StatePending, output)
+	}
 }

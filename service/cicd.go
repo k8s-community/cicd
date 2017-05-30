@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/k8s-community/cicd/builder"
 	"github.com/k8s-community/cicd/handlers"
 	"github.com/k8s-community/cicd/version"
 	ghIntegr "github.com/k8s-community/github-integration/client"
@@ -17,6 +18,10 @@ import (
 	"github.com/octago/sflags/gen/gflag"
 	"github.com/takama/daemon"
 	"github.com/takama/router"
+)
+
+const (
+	maxTasks = 20 // maximum of parallel CI/CD tasks
 )
 
 // HTTPConfig ...
@@ -32,9 +37,9 @@ type Config struct {
 
 func main() {
 	// To be able to work under daemon we need to set some environment...
-	os.Setenv("GOPATH", "/root/gocode")
+	/*os.Setenv("GOPATH", "/root/gocode")
 	os.Setenv("PATH", "$PATH:/usr/bin:/usr/local/bin:/usr/local/go/bin:/root/gocode/bin")
-	os.Setenv("HOME", "/root")
+	os.Setenv("HOME", "/root")*/
 
 	log := logrus.New()
 	log.Formatter = new(logrus.TextFormatter)
@@ -80,12 +85,14 @@ func main() {
 	}
 
 	// TODO: add graceful shutdown
+	state := builder.NewState(builder.Process, logger, 10)
 
-	buildHandler := handlers.NewBuild(logger, ghIntClient)
+	buildHandler := handlers.NewBuild(state, logger, ghIntClient)
 
 	r := router.New()
 
 	r.POST("/api/v1/build", buildHandler.Run)
+	r.GET("/api/v1/status", buildHandler.Status)
 
 	r.GET("/info", func(c *router.Control) {
 		common_handlers.Info(c, version.RELEASE, version.REPO, version.COMMIT)
