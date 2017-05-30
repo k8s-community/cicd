@@ -5,7 +5,7 @@ BUILDTAGS=
 # Use the 0.0.0 tag for testing, it shouldn't clobber any release builds
 APP=cicd
 USERSPACE?=k8s-community
-RELEASE?=0.2.3
+RELEASE?=0.2.4
 PROJECT?=github.com/${USERSPACE}/${APP}
 GOOS?=linux
 REGISTRY?=registry.k8s.community
@@ -31,7 +31,7 @@ build: vendor
 		-ldflags "-s -w -X ${PROJECT}/version.RELEASE=${RELEASE} -X ${PROJECT}/version.COMMIT=${COMMIT} -X ${PROJECT}/version.REPO=${REPO_INFO}" \
 		-o ../${APP}
 
-install: build stop remove
+install: build
 	sudo ./${APP} install --service-host ${SERVICE_HOST} --service-port ${SERVICE_PORT}
 
 remove:
