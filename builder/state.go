@@ -22,23 +22,25 @@ import (
 
 // Task represents a Task for CI/CD.
 type Task struct {
-	id     string
-	task   string
-	prefix string
-	user   string
-	repo   string
-	commit string
+	callback Callback
+	id       string
+	task     string
+	prefix   string
+	user     string
+	repo     string
+	commit   string
 }
 
 // Processor is a function to process tasks
 type Processor func(logger logrus.FieldLogger, task Task)
-type Callback func(logger logrus.FieldLogger, task Task)
+
+// Callback is a function to update information about current task state
+type Callback func(status string, description string)
 
 // State is a state of building process, it must live during the service is working
 type State struct {
 	logger    logrus.FieldLogger
 	processor Processor
-	callback  Callback
 
 	taskPool chan Task
 
@@ -54,10 +56,9 @@ type State struct {
 // - list of processing tasks and a mutex to deal with them
 // - list of 'to do' tasks and a mutex to deal with them
 // - shutdown channel to mark that service is not available for tasks anymore
-func NewState(processor Processor, callback Callback, logger logrus.FieldLogger, maxWorkers int) *State {
+func NewState(processor Processor, logger logrus.FieldLogger, maxWorkers int) *State {
 	state := &State{
 		processor:  processor,
-		callback:   callback,
 		logger:     logger,
 		taskPool:   make(chan Task, maxWorkers),
 		mutex:      &sync.RWMutex{},
@@ -74,18 +75,19 @@ func NewState(processor Processor, callback Callback, logger logrus.FieldLogger,
 }
 
 // AddTask add Task to the pool.
-// If shutdown command is sent, the Task will nod be added and the function will return an error.
-func (state *State) AddTask(id, task, prefix, user, repo, commit string) error {
+// ToDo: if shutdown command is sent, the Task will nod be added and the function will return an error.
+func (state *State) AddTask(callback Callback, id, task, prefix, user, repo, commit string) error {
 	logger := state.logger.WithField("task_id", id)
 	logger.Infof("Add task %s...", id)
 
 	t := Task{
-		id:     id,
-		task:   task,
-		prefix: prefix,
-		user:   user,
-		repo:   repo,
-		commit: commit,
+		callback: callback,
+		id:       id,
+		task:     task,
+		prefix:   prefix,
+		user:     user,
+		repo:     repo,
+		commit:   commit,
 	}
 
 	state.mutex.Lock()
@@ -105,7 +107,6 @@ func (state *State) worker(i int) {
 			logger.Infof("Worker #%d processing task %s...", i, t.id)
 
 			state.processor(state.logger, t)
-			state.callback(state.logger, t)
 
 			state.mutex.Lock()
 			delete(state.inProgress, t.user)

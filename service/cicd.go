@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/k8s-community/cicd/builder"
 	"github.com/k8s-community/cicd/handlers"
 	"github.com/k8s-community/cicd/version"
 	ghIntegr "github.com/k8s-community/github-integration/client"
@@ -36,9 +37,9 @@ type Config struct {
 
 func main() {
 	// To be able to work under daemon we need to set some environment...
-	os.Setenv("GOPATH", "/root/gocode")
+	/*os.Setenv("GOPATH", "/root/gocode")
 	os.Setenv("PATH", "$PATH:/usr/bin:/usr/local/bin:/usr/local/go/bin:/root/gocode/bin")
-	os.Setenv("HOME", "/root")
+	os.Setenv("HOME", "/root")*/
 
 	log := logrus.New()
 	log.Formatter = new(logrus.TextFormatter)
@@ -84,8 +85,9 @@ func main() {
 	}
 
 	// TODO: add graceful shutdown
+	state := builder.NewState(builder.Process, logger, 10)
 
-	buildHandler := handlers.NewBuild(logger, ghIntClient)
+	buildHandler := handlers.NewBuild(state, logger, ghIntClient)
 
 	r := router.New()
 
