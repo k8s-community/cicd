@@ -1,24 +1,28 @@
 package builder
 
 import (
-	"fmt"
-	"github.com/Sirupsen/logrus"
 	"sync"
-	"time"
+
+	"github.com/Sirupsen/logrus"
 )
 
 // Будем хранить в структуре State все данные, необходимые для конкурентного выполнения.
-// 1. Задаем канал workers такой емкости, сколько задач одновременно мы готовы обрабатывать.
-// 2. Также задаем список задач, поступивших на обработку, и список обрабатываемых в настоящий момент пользователей.
-// Для этих списков ставим мьютексы для того, чтобы конкурентно брать задачи и учитывать пользователей.
-// 3. processPool: Одновременная обработка одного и того же репозитория для одного и того же пользователя невозможна (нельзя
-// сделать два make build параллельно на разные коммиты), поэтому в случае, если на обработку попадает задача
+// 1. Задаем канал taskPool такой емкости, сколько задач одновременно мы готовы обрабатывать,
+// и запускаем workers для обработки этого канала.
+// 2. Также задаем taskQueue - список задач, поступивших на обработку, и inProgress - список обрабатываемых
+// в настоящий момент пользователей. taskQueue - это очередь на добавление в taskPool, а inProgress - это задачи,
+// которые в настоящий момент находятся в taskPool.
+// Для этих списков ставим мьютекс для того, чтобы конкурентно брать задачи и учитывать пользователей.
+// 3. processPool: Одновременная обработка одного и того же репозитория для одного и того же пользователя невозможна
+// (нельзя обработать параллельно разные коммиты), поэтому в случае, если на обработку попадает задача
 // для такого пользователя и репозитория, который уже обрабатывается, эту задачу перенесем в конец списка задач.
-// 4. Shutdown: В случае, если сервису был отправлен сигнал завершения работы, прием новых задач прекращается
-// (AddTask возвращает ошибку). Сервис будет завершен после того, как будут обработаны текущие задачи.
+
+// ToDo: add graceful shutdown!
+// ToDo: add max execution time per task!!!
 
 // Task represents a Task for CI/CD.
 type Task struct {
+	id     string
 	task   string
 	prefix string
 	user   string
@@ -28,16 +32,19 @@ type Task struct {
 
 // Processor is a function to process tasks
 type Processor func(logger logrus.FieldLogger, task Task)
+type Callback func(logger logrus.FieldLogger, task Task)
 
 // State is a state of building process, it must live during the service is working
 type State struct {
-	logger     logrus.FieldLogger
-	processor  Processor
-	maxWorkers chan Task
+	logger    logrus.FieldLogger
+	processor Processor
+	callback  Callback
 
-	mutex     *sync.RWMutex
-	progress  map[string]string
-	tasks     []Task
+	taskPool chan Task
+
+	mutex      *sync.RWMutex
+	inProgress map[string]string
+	taskQueue  []Task
 }
 
 // NewState creates new State instance with the parameters:
@@ -47,17 +54,18 @@ type State struct {
 // - list of processing tasks and a mutex to deal with them
 // - list of 'to do' tasks and a mutex to deal with them
 // - shutdown channel to mark that service is not available for tasks anymore
-func NewState(processor Processor, logger logrus.FieldLogger, maxWorkers int) *State {
+func NewState(processor Processor, callback Callback, logger logrus.FieldLogger, maxWorkers int) *State {
 	state := &State{
 		processor:  processor,
+		callback:   callback,
 		logger:     logger,
-		maxWorkers: make(chan Task, maxWorkers),
+		taskPool:   make(chan Task, maxWorkers),
 		mutex:      &sync.RWMutex{},
-		progress:   make(map[string]string),
+		inProgress: make(map[string]string),
 	}
 
-	for i:=0; i<maxWorkers; i++ {
-		go state.worker()
+	for i := 0; i < maxWorkers; i++ {
+		go state.worker(i)
 	}
 
 	go state.processPool()
@@ -65,101 +73,98 @@ func NewState(processor Processor, logger logrus.FieldLogger, maxWorkers int) *S
 	return state
 }
 
-func (state *State) worker() {
-	for {
-		select {
-		case t := <-state.maxWorkers:
-			state.processor(state.logger, t)
-
-			state.mutex.Lock()
-			delete(state.progress, t.user)
-			state.mutex.Unlock()
-		}
-	}
-}
-
 // AddTask add Task to the pool.
 // If shutdown command is sent, the Task will nod be added and the function will return an error.
-func (state *State) AddTask(task, prefix, user, repo, commit string) error {
-	state.logger.Info("Add task")
+func (state *State) AddTask(id, task, prefix, user, repo, commit string) error {
+	logger := state.logger.WithField("task_id", id)
+	logger.Infof("Add task %s...", id)
+
 	t := Task{
+		id:     id,
 		task:   task,
 		prefix: prefix,
 		user:   user,
 		repo:   repo,
 		commit: commit,
 	}
-	state.setTask(t)
-	state.logger.Info("Task added")
+
+	state.mutex.Lock()
+	state.taskQueue = append(state.taskQueue, t)
+	state.mutex.Unlock()
+
+	logger.Info("Task added.")
 
 	return nil
+}
+
+func (state *State) worker(i int) {
+	for {
+		select {
+		case t := <-state.taskPool:
+			logger := state.logger.WithField("task_id", t.id)
+			logger.Infof("Worker #%d processing task %s...", i, t.id)
+
+			state.processor(state.logger, t)
+			state.callback(state.logger, t)
+
+			state.mutex.Lock()
+			delete(state.inProgress, t.user)
+			logger.Infof("Worker #%d processed task %s.", i, t.id)
+			state.mutex.Unlock()
+		}
+	}
 }
 
 // processPool gets Task from the pool.
 // You can call this function concurrently, state.workers parameter decides if it is possible to add one more worker.
 func (state *State) processPool() {
 	for {
-		if len(state.tasks) == 0 {
+		if state.queueLen() == 0 {
 			continue
 		}
 
 		state.mutex.Lock()
 
-		t := state.tasks[0]
-		repo, ok := state.progress[t.user]
+		t := state.taskQueue[0]
+
+		logger := state.logger.WithField("task_id", t.id)
+		logger.Debugf("Task %s is getting from the queue...", t.id)
+
+		repo, ok := state.inProgress[t.user]
 
 		// if this user is already in progress, move him to the end of the queue
 		// (couldn't process the same user at the same time)
+		addToPool := false
 		if ok && (repo == t.repo) {
-			state.tasks = append(state.tasks, t)
+			state.taskQueue = append(state.taskQueue, t)
+			logger.Debugf("Task %s moved back to the queue.", t.id)
 		} else {
 			// otherwise mark user as 'in progress'
-			state.progress[t.user] = t.repo
+			state.inProgress[t.user] = t.repo
+			addToPool = true
+			logger.Debugf("Task %s is moving to the pool and is going to be processed...", t.id)
 		}
 
-		state.tasks = state.tasks[1:]
+		state.taskQueue = state.taskQueue[1:]
 
 		state.mutex.Unlock()
 
-		state.maxWorkers <- t
+		if addToPool {
+			state.taskPool <- t
+		}
 	}
 }
 
-func (state *State) getTask() Task {
+func (state *State) queueLen() int {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
 
-	return state.tasks[0]
+	return len(state.taskQueue)
 }
 
-func (state *State) setTask(t Task) {
+func (state *State) queuesEmpty() bool {
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
 
-	state.tasks = append(state.tasks, t)
-}
-
-func (state *State) deleteTask() {
-	state.mutex.Lock()
-	defer state.mutex.Unlock()
-
-}
-
-func (state *State) getCurrent(user string) (string, bool) {
-	state.mutex.Lock()
-	defer state.mutex.Unlock()
-
-	repo, ok := state.progress[user]
-	return repo, ok
-}
-
-func (state *State) setCurrent(user, repo string) {
-	state.mutex.Lock()
-	defer state.mutex.Unlock()
-
-	state.progress[user] = repo
-}
-
-func (state *State) deleteCurrent() {
-
+	return len(state.taskQueue) == 0 && len(state.inProgress) == 0
 }

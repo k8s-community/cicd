@@ -1,42 +1,61 @@
 package builder
 
 import (
-	"github.com/Sirupsen/logrus"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/Sirupsen/logrus"
 )
 
-func prepareState(maxWorkers int) *State {
+func prepareState(mux *sync.RWMutex, completed map[string]string, maxWorkers int) *State {
 	processor := func(logger logrus.FieldLogger, task Task) {
-		time.Sleep(3 * time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
-	state := NewState(processor, logrus.WithField("test", "test"), maxWorkers)
+
+	// callback "counts" all tasks which were processed
+	callback := func(logger logrus.FieldLogger, task Task) {
+		mux.Lock()
+		completed[task.id] = task.id
+		mux.Unlock()
+	}
+	state := NewState(processor, callback, logrus.WithField("max_workers", maxWorkers), maxWorkers)
 	return state
 }
 
-func TestState(t *testing.T) {
-	//prepareState().AddTask()
-}
-
+// Please, run tests with race detector: go test -v -race
 func TestAddTask(t *testing.T) {
-	state := prepareState(2)
+	maxWorkers := []int{1, 2, 5, 10, 20}
 
-	state.AddTask("test", "test", "test", "test", "test")
-	if len(state.tasks) != 1 {
-		t.Fail()
-	}
+	for _, maxW := range maxWorkers {
+		mux := &sync.RWMutex{}
+		completed := make(map[string]string)
+		state := prepareState(mux, completed, maxW)
 
-	state.AddTask("test", "test", "test", "test", "test")
+		state.AddTask("1", "test", "test", "user_1", "test", "test")
+		state.AddTask("2", "test", "test", "user_1", "test", "test")
+		state.AddTask("3", "test", "test", "user_2", "test", "test")
+		state.AddTask("4", "test", "test", "user_3", "test", "test")
+		state.AddTask("5", "test", "test", "user_4", "test", "test")
+		state.AddTask("6", "test", "test", "user_5", "test", "test")
+		state.AddTask("7", "test", "test", "user_5", "test", "test")
+		state.AddTask("8", "test", "test", "user_5", "test", "test")
+		state.AddTask("9", "test", "test", "user_5", "test", "test")
+		state.AddTask("10", "test", "test", "user_5", "test", "test")
 
-	for {
-		go state.processPool()
-	}
+		for {
+			if state.queuesEmpty() {
+				break
+			}
+		}
 
-	state.Shutdown()
-	if len(state.tasks) != 0 {
-		t.Fail()
-	}
-	if len(state.progress) != 0 {
-		t.Fail()
+		taskIDs := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"}
+		for _, taskID := range taskIDs {
+			_, ok := completed[taskID]
+
+			if !ok {
+				t.Errorf("Task %s was not completed!", taskID)
+			}
+		}
 	}
 }
