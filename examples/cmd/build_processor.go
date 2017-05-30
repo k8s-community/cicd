@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/k8s-community/cicd/builder"
+	"github.com/satori/go.uuid"
 )
 
 var (
@@ -18,5 +19,14 @@ var (
 func main() {
 	flag.Parse()
 	log := logrus.New()
-	builder.Process(log, *fPrefix, *fUser, *fRepo, *fCommit)
+	task := builder.NewTask(
+		func(state string, description string) { log.Info(state, description) },
+		uuid.NewV4().String(),
+		"test",
+		*fPrefix,
+		*fUser,
+		*fRepo,
+		*fCommit,
+	)
+	builder.Process(log, task)
 }
