@@ -71,6 +71,7 @@ func main() {
 		logger.Fatalf("%s: %s", status, err)
 	}
 	if status != "ok" {
+		fmt.Println(status)
 		os.Exit(0)
 	}
 
