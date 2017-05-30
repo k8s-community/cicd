@@ -29,7 +29,7 @@ func TestAddTask(t *testing.T) {
 	state.AddTask("test", "test", "test", "test", "test")
 
 	for {
-		go state.ProcessPool()
+		go state.processPool()
 	}
 
 	state.Shutdown()
