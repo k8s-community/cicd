@@ -29,6 +29,21 @@ func NewBuild(state *builder.State, log logrus.FieldLogger, ghIntClient *ghInteg
 	}
 }
 
+// Status shows current tasks status
+func (b *Build) Status(c *router.Control) {
+	queue, current := b.state.GetTasks()
+
+	response := struct {
+		Queue   []string `json:"queue"`
+		Current []string `json:"current"`
+	}{
+		Queue:   queue,
+		Current: current,
+	}
+
+	c.Code(http.StatusOK).Body(response)
+}
+
 // Run handles build running
 func (b *Build) Run(c *router.Control) {
 	requestID := uuid.NewV4().String()

@@ -8,18 +8,13 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
-func prepareState(mux *sync.RWMutex, completed map[string]string, maxWorkers int) *State {
+func prepareState(maxWorkers int) *State {
 	processor := func(logger logrus.FieldLogger, task Task) {
 		time.Sleep(100 * time.Millisecond)
+		task.callback(task.id, task.id)
 	}
 
-	// callback "counts" all tasks which were processed
-	callback := func(logger logrus.FieldLogger, task Task) {
-		mux.Lock()
-		completed[task.id] = task.id
-		mux.Unlock()
-	}
-	state := NewState(processor, callback, logrus.WithField("max_workers", maxWorkers), maxWorkers)
+	state := NewState(processor, logrus.WithField("max_workers", maxWorkers), maxWorkers)
 	return state
 }
 
@@ -30,18 +25,25 @@ func TestAddTask(t *testing.T) {
 	for _, maxW := range maxWorkers {
 		mux := &sync.RWMutex{}
 		completed := make(map[string]string)
-		state := prepareState(mux, completed, maxW)
+		state := prepareState(maxW)
 
-		state.AddTask("1", "test", "test", "user_1", "test", "test")
-		state.AddTask("2", "test", "test", "user_1", "test", "test")
-		state.AddTask("3", "test", "test", "user_2", "test", "test")
-		state.AddTask("4", "test", "test", "user_3", "test", "test")
-		state.AddTask("5", "test", "test", "user_4", "test", "test")
-		state.AddTask("6", "test", "test", "user_5", "test", "test")
-		state.AddTask("7", "test", "test", "user_5", "test", "test")
-		state.AddTask("8", "test", "test", "user_5", "test", "test")
-		state.AddTask("9", "test", "test", "user_5", "test", "test")
-		state.AddTask("10", "test", "test", "user_5", "test", "test")
+		// callback "counts" all tasks which were processed
+		callback := func(state string, description string) {
+			mux.Lock()
+			completed[state] = description
+			mux.Unlock()
+		}
+
+		state.AddTask(callback, "1", "test", "test", "user_1", "test", "test")
+		state.AddTask(callback, "2", "test", "test", "user_1", "test", "test")
+		state.AddTask(callback, "3", "test", "test", "user_2", "test", "test")
+		state.AddTask(callback, "4", "test", "test", "user_3", "test", "test")
+		state.AddTask(callback, "5", "test", "test", "user_4", "test", "test")
+		state.AddTask(callback, "6", "test", "test", "user_5", "test", "test")
+		state.AddTask(callback, "7", "test", "test", "user_5", "test", "test")
+		state.AddTask(callback, "8", "test", "test", "user_5", "test", "test")
+		state.AddTask(callback, "9", "test", "test", "user_5", "test", "test")
+		state.AddTask(callback, "10", "test", "test", "user_5", "test", "test")
 
 		for {
 			if state.queuesEmpty() {

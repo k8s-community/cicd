@@ -31,6 +31,19 @@ type Task struct {
 	commit   string
 }
 
+// NewTask creates an instance of a task.
+func NewTask(callback Callback, id, task, prefix, user, repo, commit string) Task {
+	return Task{
+		callback: callback,
+		id:       id,
+		task:     task,
+		prefix:   prefix,
+		user:     user,
+		repo:     repo,
+		commit:   commit,
+	}
+}
+
 // Processor is a function to process tasks
 type Processor func(logger logrus.FieldLogger, task Task)
 
@@ -45,7 +58,7 @@ type State struct {
 	taskPool chan Task
 
 	mutex      *sync.RWMutex
-	inProgress map[string]string
+	inProgress map[string]Task
 	taskQueue  []Task
 }
 
@@ -62,7 +75,7 @@ func NewState(processor Processor, logger logrus.FieldLogger, maxWorkers int) *S
 		logger:     logger,
 		taskPool:   make(chan Task, maxWorkers),
 		mutex:      &sync.RWMutex{},
-		inProgress: make(map[string]string),
+		inProgress: make(map[string]Task),
 	}
 
 	for i := 0; i < maxWorkers; i++ {
@@ -72,6 +85,24 @@ func NewState(processor Processor, logger logrus.FieldLogger, maxWorkers int) *S
 	go state.processPool()
 
 	return state
+}
+
+func (state *State) GetTasks() ([]string, []string) {
+	var queue []string
+	var current []string
+
+	state.mutex.Lock()
+	defer state.mutex.Unlock()
+
+	for _, task := range state.taskQueue {
+		queue = append(queue, task.user+"/"+task.repo+": "+task.id)
+	}
+
+	for user, task := range state.inProgress {
+		current = append(current, user+"/"+task.repo+": "+task.id)
+	}
+
+	return queue, current
 }
 
 // AddTask add Task to the pool.
@@ -131,17 +162,17 @@ func (state *State) processPool() {
 		logger := state.logger.WithField("task_id", t.id)
 		logger.Debugf("Task %s is getting from the queue...", t.id)
 
-		repo, ok := state.inProgress[t.user]
+		inProgress, ok := state.inProgress[t.user]
 
 		// if this user is already in progress, move him to the end of the queue
 		// (couldn't process the same user at the same time)
 		addToPool := false
-		if ok && (repo == t.repo) {
+		if ok && (inProgress.repo == t.repo) {
 			state.taskQueue = append(state.taskQueue, t)
 			logger.Debugf("Task %s moved back to the queue.", t.id)
 		} else {
 			// otherwise mark user as 'in progress'
-			state.inProgress[t.user] = t.repo
+			state.inProgress[t.user] = t
 			addToPool = true
 			logger.Debugf("Task %s is moving to the pool and is going to be processed...", t.id)
 		}
