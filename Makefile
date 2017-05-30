@@ -31,7 +31,7 @@ build: vendor
 		-ldflags "-s -w -X ${PROJECT}/version.RELEASE=${RELEASE} -X ${PROJECT}/version.COMMIT=${COMMIT} -X ${PROJECT}/version.REPO=${REPO_INFO}" \
 		-o ../${APP}
 
-install: build stop remove
+install: build
 	sudo ./${APP} install --service-host ${SERVICE_HOST} --service-port ${SERVICE_PORT}
 
 remove:
