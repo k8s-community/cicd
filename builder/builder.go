@@ -51,12 +51,12 @@ func Process(log logrus.FieldLogger, task Task) {
 		return
 	}
 
-	/*out, err = runCommand(logger, []string{"NAMESPACE=" + task.user}, dir, "make", "deploy")
+	out, err = runCommand(logger, []string{"NAMESPACE=" + task.user}, dir, "make", "deploy")
 	output += out
 	processCommandResult(task.callback, output, err)
 	if err != nil {
 		return
-	}*/
+	}
 
 	task.callback(ghIntegr.StateSuccess, output)
 }
