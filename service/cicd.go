@@ -20,10 +20,6 @@ import (
 	"github.com/takama/router"
 )
 
-const (
-	maxTasks = 20 // maximum of parallel CI/CD tasks
-)
-
 // HTTPConfig ...
 type HTTPConfig struct {
 	Host string `env:"SERVICE_HOST"`
@@ -37,12 +33,12 @@ type Config struct {
 
 func main() {
 	// To be able to work under daemon we need to set some environment...
-	os.Setenv("GOPATH", "/root/gocode")
+	/*os.Setenv("GOPATH", "/root/gocode")
 	os.Setenv("PATH", "$PATH:/usr/bin:/usr/local/bin:/usr/local/go/bin:/root/gocode/bin")
-	os.Setenv("HOME", "/root")
+	os.Setenv("HOME", "/root")*/
 
 	log := logrus.New()
-	log.Formatter = new(logrus.TextFormatter)
+	log.Formatter = new(logrus.JSONFormatter)
 	logger := log.WithFields(logrus.Fields{"service": "cicd"})
 	cfg := &Config{
 		SERVICE: HTTPConfig{

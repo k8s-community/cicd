@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
+	"time"
 )
 
 // Будем хранить в структуре State все данные, необходимые для конкурентного выполнения.
@@ -60,6 +61,8 @@ type State struct {
 	mutex      *sync.RWMutex
 	inProgress map[string]Task
 	taskQueue  []Task
+
+	taskQueueReady chan struct{}
 }
 
 // NewState creates new State instance with the parameters:
@@ -71,11 +74,12 @@ type State struct {
 // - shutdown channel to mark that service is not available for tasks anymore
 func NewState(processor Processor, logger logrus.FieldLogger, maxWorkers int) *State {
 	state := &State{
-		processor:  processor,
-		logger:     logger,
-		taskPool:   make(chan Task, maxWorkers),
-		mutex:      &sync.RWMutex{},
-		inProgress: make(map[string]Task),
+		processor:      processor,
+		logger:         logger,
+		taskPool:       make(chan Task, maxWorkers),
+		mutex:          &sync.RWMutex{},
+		inProgress:     make(map[string]Task),
+		taskQueueReady: make(chan struct{}),
 	}
 
 	for i := 0; i < maxWorkers; i++ {
@@ -108,24 +112,15 @@ func (state *State) GetTasks() ([]string, []string) {
 
 // AddTask add Task to the pool.
 // ToDo: if shutdown command is sent, the Task will nod be added and the function will return an error.
-func (state *State) AddTask(callback Callback, id, task, prefix, user, repo, commit string) error {
-	logger := state.logger.WithField("task_id", id)
-	logger.Infof("Add task %s...", id)
-
-	t := Task{
-		callback: callback,
-		id:       id,
-		task:     task,
-		prefix:   prefix,
-		user:     user,
-		repo:     repo,
-		commit:   commit,
-	}
+func (state *State) AddTask(task *Task) error {
+	logger := state.logger.WithField("task_id", task.id)
+	logger.Infof("Add task %s...", task.id)
 
 	state.mutex.Lock()
-	state.taskQueue = append(state.taskQueue, t)
+	state.taskQueue = append(state.taskQueue, *task)
 	state.mutex.Unlock()
 
+	state.taskQueueReady <- struct{}{}
 	logger.Info("Task added.")
 
 	return nil
@@ -152,38 +147,42 @@ func (state *State) worker(i int) {
 // You can call this function concurrently, state.workers parameter decides if it is possible to add one more worker.
 func (state *State) processPool() {
 	for {
-		if state.queueLen() == 0 {
-			continue
-		}
+		select {
+		case <-state.taskQueueReady:
+			state.logger.Info("Pool processor catch taskQueueReady state...")
 
-		state.mutex.Lock()
+			state.mutex.Lock()
 
-		t := state.taskQueue[0]
+			t := state.taskQueue[0]
 
-		logger := state.logger.WithField("task_id", t.id)
-		logger.Debugf("Task %s is getting from the queue...", t.id)
+			logger := state.logger.WithField("task_id", t.id)
+			logger.Debugf("Task %s is getting from the queue...", t.id)
 
-		inProgress, ok := state.inProgress[t.user]
+			inProgress, ok := state.inProgress[t.user]
 
-		// if this user is already in progress, move him to the end of the queue
-		// (couldn't process the same user at the same time)
-		addToPool := false
-		if ok && (inProgress.repo == t.repo) {
-			state.taskQueue = append(state.taskQueue, t)
-			logger.Debugf("Task %s moved back to the queue.", t.id)
-		} else {
-			// otherwise mark user as 'in progress'
-			state.inProgress[t.user] = t
-			addToPool = true
-			logger.Debugf("Task %s is moving to the pool and is going to be processed...", t.id)
-		}
+			// if this user is already in progress, move him to the end of the queue
+			// (couldn't process the same user at the same time)
+			addToPool := false
+			if !ok || (inProgress.repo != t.repo) {
+				// otherwise mark user as 'in progress'
+				state.inProgress[t.user] = t
+				addToPool = true
+				logger.Debugf("Task %s is moving to the pool and is going to be processed...", t.id)
+			}
 
-		state.taskQueue = state.taskQueue[1:]
+			state.taskQueue = state.taskQueue[1:]
 
-		state.mutex.Unlock()
+			state.mutex.Unlock()
 
-		if addToPool {
-			state.taskPool <- t
+			if addToPool {
+				state.taskPool <- t
+			} else {
+				go func() {
+					time.Sleep(15 * time.Second)
+					state.AddTask(&t)
+				}()
+				logger.Debugf("Task %s moved back to the queue.", t.id)
+			}
 		}
 	}
 }
@@ -193,11 +192,4 @@ func (state *State) queueLen() int {
 	defer state.mutex.Unlock()
 
 	return len(state.taskQueue)
-}
-
-func (state *State) queuesEmpty() bool {
-	state.mutex.Lock()
-	defer state.mutex.Unlock()
-
-	return len(state.taskQueue) == 0 && len(state.inProgress) == 0
 }

@@ -93,6 +93,7 @@ func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 	}
 
 	// task types: test, build, release etc (instead of test)
-	b.state.AddTask(callback, requestID, "test", "github.com", namespace, req.Repository, req.CommitHash)
+	t := builder.NewTask(callback, requestID, "test", "github.com", namespace, req.Repository, req.CommitHash)
+	b.state.AddTask(&t)
 	callback(ghIntegr.StatePending, "Task was queued")
 }
