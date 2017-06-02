@@ -1,5 +1,13 @@
 package cicd
 
+const (
+	// TaskTest is a command to test application
+	TaskTest = "test"
+
+	// TaskDeploy is a command to release applicaiton
+	TaskDeploy = "deploy"
+)
+
 // Error is a common error typical for all responses
 type Error struct {
 	Code    int    `json:"code"`
@@ -8,9 +16,11 @@ type Error struct {
 
 // BuildRequest defines request body of Build API method
 type BuildRequest struct {
-	Username   string `json:"username"`
-	Repository string `json:"repository"`
-	CommitHash string `json:"commitHash"`
+	Username   string  `json:"username"`
+	Repository string  `json:"repository"`
+	CommitHash string  `json:"commitHash"`
+	Task       string  `json:"task"`
+	Version    *string `json:"version"` // Version is actual only for TaskDeploy
 }
 
 // BuildResponse defines response body of Build API method

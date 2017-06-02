@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/k8s-community/cicd"
 	ghIntegr "github.com/k8s-community/github-integration/client"
 )
 
@@ -44,18 +45,38 @@ func Process(log logrus.FieldLogger, task Task) {
 		return
 	}
 
-	out, err = runCommand(logger, []string{}, dir, "make", "test")
+	// Prepare typical Makefile by template from k8s-community/myapp
+	out, err = runCommand(
+		logger, []string{}, dir, "cp",
+		os.Getenv("GOPATH")+"/src/github.com/k8s-community/myapp/Makefile", ".",
+	)
 	output += out
 	processCommandResult(task.callback, output, err)
 	if err != nil {
 		return
 	}
 
-	out, err = runCommand(logger, []string{"NAMESPACE=" + task.user}, dir, "make", "deploy")
+	userEnv := []string{
+		"USERSPACE=" + task.user,
+		"NAMESPACE=" + task.user,
+		"APP=" + task.repo,
+		"RELEASE=" + task.version,
+	}
+
+	out, err = runCommand(logger, userEnv, dir, "make", "test")
 	output += out
 	processCommandResult(task.callback, output, err)
 	if err != nil {
 		return
+	}
+
+	if task.task == cicd.TaskDeploy {
+		out, err = runCommand(logger, userEnv, dir, "make", "deploy")
+		output += out
+		processCommandResult(task.callback, output, err)
+		if err != nil {
+			return
+		}
 	}
 
 	task.callback(ghIntegr.StateSuccess, output)
