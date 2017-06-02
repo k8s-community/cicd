@@ -31,14 +31,16 @@ func NewBuild(state *builder.State, log logrus.FieldLogger, ghIntClient *ghInteg
 
 // Status shows current tasks status
 func (b *Build) Status(c *router.Control) {
-	queue, current := b.state.GetTasks()
+	queue, current, total := b.state.GetTasks()
 
 	response := struct {
-		Queue   []string `json:"queue"`
-		Current []string `json:"current"`
+		Total      []string `json:"total"`
+		Queue      []string `json:"queue"`
+		InProgress []string `json:"inProgress"`
 	}{
-		Queue:   queue,
-		Current: current,
+		Total:      total,
+		Queue:      queue,
+		InProgress: current,
 	}
 
 	c.Code(http.StatusOK).Body(response)
@@ -82,9 +84,9 @@ func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 			Repository:  req.Repository,
 			CommitHash:  req.CommitHash,
 			State:       state,
-			BuildURL:    "https://k8s.community/" + requestID, // TODO: fix it!
-			Description: "task...",                            // TODO: less than 120 symbols
-			Context:     "k8s-community/cicd",                 // TODO: fix it!
+			BuildURL:    "https://k8s.community/builds/" + requestID, // TODO: fix it!
+			Description: "Waiting for " + req.Task,                   // TODO: less than 120 symbols
+			Context:     "k8s-community/" + cicd.TaskTest,            // TODO: fix it!
 		}
 		err := b.githubIntegrationClient.Build.BuildCallback(callbackData)
 		if err != nil {
@@ -92,8 +94,14 @@ func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 		}
 	}
 
-	// task types: test, build, release etc (instead of test)
-	t := builder.NewTask(callback, requestID, "test", "github.com", namespace, req.Repository, req.CommitHash)
+	version := ""
+	if req.Version != nil {
+		version = *req.Version
+	}
+	t := builder.NewTask(
+		callback, requestID, req.Task, "github.com", namespace, req.Repository, req.CommitHash, version,
+	)
 	b.state.AddTask(&t)
+
 	callback(ghIntegr.StatePending, "Task was queued")
 }

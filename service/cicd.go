@@ -38,7 +38,7 @@ func main() {
 	os.Setenv("HOME", "/root")*/
 
 	log := logrus.New()
-	log.Formatter = new(logrus.JSONFormatter)
+	log.Formatter = new(logrus.TextFormatter)
 	logger := log.WithFields(logrus.Fields{"service": "cicd"})
 	cfg := &Config{
 		SERVICE: HTTPConfig{

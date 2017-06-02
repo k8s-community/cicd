@@ -30,10 +30,11 @@ type Task struct {
 	user     string
 	repo     string
 	commit   string
+	version  string
 }
 
 // NewTask creates an instance of a task.
-func NewTask(callback Callback, id, task, prefix, user, repo, commit string) Task {
+func NewTask(callback Callback, id, task, prefix, user, repo, commit, version string) Task {
 	return Task{
 		callback: callback,
 		id:       id,
@@ -42,6 +43,7 @@ func NewTask(callback Callback, id, task, prefix, user, repo, commit string) Tas
 		user:     user,
 		repo:     repo,
 		commit:   commit,
+		version:  version,
 	}
 }
 
@@ -63,6 +65,7 @@ type State struct {
 	taskQueue  []Task
 
 	taskQueueReady chan struct{}
+	total          map[string]string
 }
 
 // NewState creates new State instance with the parameters:
@@ -80,6 +83,7 @@ func NewState(processor Processor, logger logrus.FieldLogger, maxWorkers int) *S
 		mutex:          &sync.RWMutex{},
 		inProgress:     make(map[string]Task),
 		taskQueueReady: make(chan struct{}),
+		total:          make(map[string]string),
 	}
 
 	for i := 0; i < maxWorkers; i++ {
@@ -92,9 +96,10 @@ func NewState(processor Processor, logger logrus.FieldLogger, maxWorkers int) *S
 }
 
 // GetTasks get Tasks to the pool.
-func (state *State) GetTasks() ([]string, []string) {
+func (state *State) GetTasks() ([]string, []string, []string) {
 	var queue []string
-	var current []string
+	var progress []string
+	var total []string
 
 	state.mutex.Lock()
 	defer state.mutex.Unlock()
@@ -104,10 +109,14 @@ func (state *State) GetTasks() ([]string, []string) {
 	}
 
 	for user, task := range state.inProgress {
-		current = append(current, user+"/"+task.repo+": "+task.id)
+		progress = append(progress, user+"/"+task.repo+": "+task.id)
 	}
 
-	return queue, current
+	for taskID, repo := range state.total {
+		total = append(total, repo+": "+taskID)
+	}
+
+	return queue, progress, total
 }
 
 // AddTask add Task to the pool.
@@ -120,6 +129,8 @@ func (state *State) AddTask(task *Task) error {
 	state.taskQueue = append(state.taskQueue, *task)
 	state.mutex.Unlock()
 
+	state.total[task.id] = task.user + "/" + task.repo
+
 	state.taskQueueReady <- struct{}{}
 	logger.Info("Task added.")
 
@@ -130,6 +141,8 @@ func (state *State) worker(i int) {
 	for {
 		select {
 		case t := <-state.taskPool:
+			delete(state.total, t.id)
+
 			logger := state.logger.WithField("task_id", t.id)
 			logger.Infof("Worker #%d processing task %s...", i, t.id)
 
