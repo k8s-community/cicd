@@ -192,6 +192,12 @@ func (state *Dispatcher) processWaitingQueue() {
 
 			state.mxQueues.Lock()
 
+			// if there are no waiting tasks because of shutting down, just continue
+			if len(state.waiting) == 0 {
+				state.mxQueues.Unlock()
+				continue
+			}
+
 			t := state.waiting[0]
 
 			logger := state.logger.WithField("task_id", t.ID)
