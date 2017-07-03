@@ -9,8 +9,11 @@ import (
 	"strconv"
 	"syscall"
 
+	"time"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/k8s-community/cicd/builder"
+	"github.com/k8s-community/cicd/builder/runners"
 	"github.com/k8s-community/cicd/handlers"
 	"github.com/k8s-community/cicd/version"
 	ghIntegr "github.com/k8s-community/github-integration/client"
@@ -82,7 +85,8 @@ func main() {
 	}
 
 	// TODO: add graceful shutdown
-	state := builder.NewState(builder.Process, logger, 10)
+	runner := runners.NewLocal(log)
+	state := builder.NewDispatcher(runner.Process, logger, 10, 15*time.Second)
 
 	buildHandler := handlers.NewBuild(state, logger, ghIntClient)
 

@@ -1,4 +1,4 @@
-package builder
+package runners
 
 import (
 	"fmt"
@@ -8,22 +8,35 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/k8s-community/cicd"
+	"github.com/k8s-community/cicd/builder/task"
 	ghIntegr "github.com/k8s-community/github-integration/client"
 )
 
+// Local represent simple local builder (it runs tasks on current environment)
+type Local struct {
+	log logrus.FieldLogger
+}
+
+// NewLocal returns an instance of Local runner
+func NewLocal(log logrus.FieldLogger) *Local {
+	return &Local{
+		log: log,
+	}
+}
+
 // Process do CICD work: go get of repo, git checkout to given commit, make test and make deploy
-func Process(log logrus.FieldLogger, task Task) {
-	logger := log.WithFields(logrus.Fields{"source": task.prefix, "user": task.user, "repo": task.repo, "commit": task.commit})
+func (runner *Local) Process(taskItem task.CICD) {
+	logger := runner.log.WithFields(logrus.Fields{"source": taskItem.Prefix, "repo": taskItem.Repo, "commit": taskItem.Commit})
 
 	// TODO: it's good to use something like build.Default.GOPATH, but it doesn't work with daemon
 	gopath := os.Getenv("GOPATH")
 
-	url := fmt.Sprintf("%s/%s/%s", task.prefix, task.user, task.repo)
+	url := fmt.Sprintf("%s/%s", taskItem.Prefix, taskItem.Repo)
 	dir := fmt.Sprintf("%s/src/%s", gopath, url)
 
 	logger.Infof("Remove dir %s", dir)
 	err := os.RemoveAll(dir)
-	processCommandResult(task.callback, "", err)
+	processCommandResult(taskItem.ID, taskItem.Callback, "", err)
 	if err != nil {
 		logger.Errorf("Couldn't remove directory %s: %s", dir, err)
 		return
@@ -33,14 +46,14 @@ func Process(log logrus.FieldLogger, task Task) {
 
 	out, err := runCommand(logger, []string{}, gopath, "go", "get", "-u", url)
 	output += out
-	processCommandResult(task.callback, output, err)
+	processCommandResult(taskItem.ID, taskItem.Callback, output, err)
 	if err != nil {
 		return
 	}
 
-	out, err = runCommand(logger, []string{}, dir, "git", "checkout", task.commit)
+	out, err = runCommand(logger, []string{}, dir, "git", "checkout", taskItem.Commit)
 	output += out
-	processCommandResult(task.callback, output, err)
+	processCommandResult(taskItem.ID, taskItem.Callback, output, err)
 	if err != nil {
 		return
 	}
@@ -51,35 +64,35 @@ func Process(log logrus.FieldLogger, task Task) {
 		os.Getenv("GOPATH")+"/src/github.com/k8s-community/myapp/Makefile", ".",
 	)
 	output += out
-	processCommandResult(task.callback, output, err)
+	processCommandResult(taskItem.ID, taskItem.Callback, output, err)
 	if err != nil {
 		return
 	}
 
 	userEnv := []string{
-		"USERSPACE=" + task.user,
-		"NAMESPACE=" + task.user,
-		"APP=" + task.repo,
-		"RELEASE=" + task.version,
+		"USERSPACE=" + taskItem.Namespace,
+		"NAMESPACE=" + taskItem.Namespace,
+		"APP=" + taskItem.Repo,
+		"RELEASE=" + taskItem.Version,
 	}
 
 	out, err = runCommand(logger, userEnv, dir, "make", "test")
 	output += out
-	processCommandResult(task.callback, output, err)
+	processCommandResult(taskItem.ID, taskItem.Callback, output, err)
 	if err != nil {
 		return
 	}
 
-	if task.task == cicd.TaskDeploy {
+	if taskItem.Type == cicd.TaskDeploy {
 		out, err = runCommand(logger, userEnv, dir, "make", "deploy")
 		output += out
-		processCommandResult(task.callback, output, err)
+		processCommandResult(taskItem.ID, taskItem.Callback, output, err)
 		if err != nil {
 			return
 		}
 	}
 
-	task.callback(ghIntegr.StateSuccess, output)
+	taskItem.Callback(taskItem.ID, ghIntegr.StateSuccess, output)
 }
 
 func runCommand(logger logrus.FieldLogger, env []string, dir, name string, arg ...string) (string, error) {
@@ -111,10 +124,10 @@ func runCommand(logger logrus.FieldLogger, env []string, dir, name string, arg .
 	return commandOut, nil
 }
 
-func processCommandResult(callback Callback, output string, err error) {
+func processCommandResult(taskID string, callback task.Callback, output string, err error) {
 	if err != nil {
-		callback(ghIntegr.StateError, output+" \n\nError: "+err.Error())
+		callback(taskID, ghIntegr.StateError, output+" \n\nError: "+err.Error())
 	} else {
-		callback(ghIntegr.StatePending, output)
+		callback(taskID, ghIntegr.StatePending, output)
 	}
 }
