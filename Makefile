@@ -5,7 +5,7 @@ BUILDTAGS=
 # Use the 0.0.0 tag for testing, it shouldn't clobber any release builds
 APP=cicd
 USERSPACE?=k8s-community
-RELEASE?=0.3.1
+RELEASE?=0.4.0
 PROJECT?=github.com/${USERSPACE}/${APP}
 GOOS?=linux
 REGISTRY?=registry.k8s.community
@@ -21,9 +21,6 @@ endif
 vendor: clean
 	go get -u github.com/Masterminds/glide \
 	&& glide install
-
-utils:
-	go get -u github.com/golang/lint/golint
 
 build: vendor
 	cd service \
@@ -49,6 +46,7 @@ fmt:
 
 lint: utils
 	@echo "+ $@"
+	go get -u github.com/golang/lint/golint
 	@go list -f '{{if len .TestGoFiles}}"golint {{.Dir}}/..."{{end}}' $(shell go list ${PROJECT}/... | grep -v vendor) | xargs -L 1 sh -c
 
 vet:
