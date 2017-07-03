@@ -22,9 +22,6 @@ vendor: clean
 	go get -u github.com/Masterminds/glide \
 	&& glide install
 
-utils:
-	go get -u github.com/golang/lint/golint
-
 build: vendor
 	cd service \
 	&& CGO_ENABLED=0 GOOS=${GOOS} go build -a -installsuffix cgo \
@@ -49,6 +46,7 @@ fmt:
 
 lint: utils
 	@echo "+ $@"
+	go get -u github.com/golang/lint/golint
 	@go list -f '{{if len .TestGoFiles}}"golint {{.Dir}}/..."{{end}}' $(shell go list ${PROJECT}/... | grep -v vendor) | xargs -L 1 sh -c
 
 vet:
