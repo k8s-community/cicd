@@ -5,7 +5,7 @@ BUILDTAGS=
 # Use the 0.0.0 tag for testing, it shouldn't clobber any release builds
 APP=cicd
 USERSPACE?=k8s-community
-RELEASE?=0.3.1
+RELEASE?=0.4.0
 PROJECT?=github.com/${USERSPACE}/${APP}
 GOOS?=linux
 REGISTRY?=registry.k8s.community
