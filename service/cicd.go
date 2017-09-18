@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
-
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -17,8 +16,8 @@ import (
 	"github.com/k8s-community/cicd/handlers"
 	"github.com/k8s-community/cicd/version"
 	ghIntegr "github.com/k8s-community/github-integration/client"
-	common_handlers "github.com/k8s-community/handlers"
 	"github.com/octago/sflags/gen/gflag"
+	"github.com/openprovider/handlers/info"
 	"github.com/takama/daemon"
 	"github.com/takama/router"
 )
@@ -95,9 +94,7 @@ func main() {
 	r.POST("/api/v1/build", buildHandler.Run)
 	r.GET("/api/v1/status", buildHandler.Status)
 
-	r.GET("/info", func(c *router.Control) {
-		common_handlers.Info(c, version.RELEASE, version.REPO, version.COMMIT)
-	})
+	r.GET("/info", info.Handler(version.RELEASE, version.REPO, version.COMMIT))
 	r.GET("/healthz", func(c *router.Control) {
 		c.Code(http.StatusOK).Body(http.StatusText(http.StatusOK))
 	})
