@@ -58,10 +58,10 @@ func (runner *Local) Process(taskItem task.CICD) {
 		return
 	}
 
-	// Prepare typical Makefile by template from k8s-community/myapp
+	// Prepare typical Makefile by template from k8s-community/k8sapp
 	out, err = runCommand(
 		logger, []string{}, dir, "cp",
-		os.Getenv("GOPATH")+"/src/github.com/k8s-community/myapp/Makefile", ".",
+		os.Getenv("GOPATH")+"/src/github.com/k8s-community/k8sapp/Makefile", ".",
 	)
 	output += out
 	processCommandResult(taskItem.ID, taskItem.Callback, output, err)
@@ -70,7 +70,6 @@ func (runner *Local) Process(taskItem task.CICD) {
 	}
 
 	userEnv := []string{
-		"USERSPACE=" + taskItem.Namespace,
 		"NAMESPACE=" + taskItem.Namespace,
 		"APP=" + taskItem.Repo,
 		"RELEASE=" + taskItem.Version,
