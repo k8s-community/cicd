@@ -100,7 +100,7 @@ func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 		version = *req.Version
 	}
 	t := task.NewCICD(
-		callback, requestID, req.Task, "github.com", namespace+"/"+req.Repository, req.CommitHash, version, namespace,
+		callback, requestID, req.Task, "github.com", req.Repository, req.CommitHash, version, namespace,
 	)
 	callback(requestID, ghIntegr.StatePending, "Task was queued")
 	b.state.AddTask(t)

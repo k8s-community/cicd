@@ -5,14 +5,14 @@ BUILDTAGS=
 # Use the 0.0.0 tag for testing, it shouldn't clobber any release builds
 APP=cicd
 USERSPACE?=k8s-community
-RELEASE?=0.4.3
+RELEASE?=0.4.4
 PROJECT?=github.com/${USERSPACE}/${APP}
 GOOS?=linux
 
 # App configuration: what service to listen to etc
 SERVICE_HOST?=0.0.0.0
 SERVICE_PORT?=8080
-GITHUBINT_BASE_URL?=https://services.k8s.community/github-integration
+GITHUBINT_BASE_URL?=https://services.k8s.community/k8s-community/github-integration
 
 REPO_INFO=$(shell git config --get remote.origin.url)
 
