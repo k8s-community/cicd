@@ -48,7 +48,7 @@ func (runner *Local) Process(taskItem task.CICD) {
 	output += out
 	processCommandResult(taskItem.ID, taskItem.Callback, output, err)
 	if err != nil {
-		return
+		logger.Errorf("Go get returned error: %v", err)
 	}
 
 	out, err = runCommand(logger, []string{}, dir, "git", "checkout", taskItem.Commit)
