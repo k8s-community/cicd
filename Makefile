@@ -12,7 +12,7 @@ GOOS?=linux
 # App configuration: what service to listen to etc
 SERVICE_HOST?=0.0.0.0
 SERVICE_PORT?=8080
-GITHUBINT_BASE_URL?=https://services.k8s.community/github-integration
+GITHUBINT_BASE_URL?=https://services.k8s.community/k8s-community/github-integration
 
 REPO_INFO=$(shell git config --get remote.origin.url)
 
