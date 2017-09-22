@@ -30,7 +30,8 @@ type HTTPConfig struct {
 
 // Config ...
 type Config struct {
-	SERVICE HTTPConfig
+	SERVICE         HTTPConfig
+	GHIntegrBaseURL string `flag:"githubint-base-url"`
 }
 
 func main() {
@@ -47,6 +48,7 @@ func main() {
 			Host: "0.0.0.0",
 			Port: 8080,
 		},
+		GHIntegrBaseURL: "https://services.k8s.community/github-integration",
 	}
 	err := gflag.ParseToDef(cfg)
 	if err != nil {
@@ -75,8 +77,10 @@ func main() {
 
 	ghIntBaseURL, err := getFromEnv("GITHUBINT_BASE_URL")
 	if err != nil {
-		ghIntBaseURL = "https://services.k8s.community/github-integration" // todo: fix to flags
+		ghIntBaseURL = cfg.GHIntegrBaseURL
 	}
+
+	logger.Infof("Github integration base URL is %s", ghIntBaseURL)
 
 	ghIntClient, err := ghIntegr.NewClient(nil, ghIntBaseURL)
 	if err != nil {
