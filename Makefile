@@ -8,9 +8,11 @@ USERSPACE?=k8s-community
 RELEASE?=0.4.2
 PROJECT?=github.com/${USERSPACE}/${APP}
 GOOS?=linux
-REGISTRY?=registry.k8s.community
+
+# App configuration: what service to listen to etc
 SERVICE_HOST?=0.0.0.0
 SERVICE_PORT?=8080
+GITHUBINT_BASE_URL?=https://services.k8s.community/github-integration
 
 REPO_INFO=$(shell git config --get remote.origin.url)
 
@@ -29,7 +31,8 @@ build: vendor
 		-o ../${APP}
 
 install: build
-	sudo ./${APP} install --service-host ${SERVICE_HOST} --service-port ${SERVICE_PORT}
+	sudo ./${APP} install --service-host ${SERVICE_HOST} --service-port ${SERVICE_PORT} \
+	 --githubint-base-url ${GITHUBINT_BASE_URL}
 
 remove:
 	sudo ./${APP} remove
