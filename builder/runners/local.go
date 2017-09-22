@@ -72,7 +72,7 @@ func (runner *Local) Process(taskItem task.CICD) {
 	userEnv := []string{
 		"NAMESPACE=" + taskItem.Namespace,
 		"APP=" + taskItem.Repo,
-		"RELEASE=" + taskItem.Version,
+		//	"RELEASE=" + taskItem.Version,
 	}
 
 	out, err = runCommand(logger, userEnv, dir, "make", "test")
