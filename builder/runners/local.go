@@ -73,6 +73,7 @@ func (runner *Local) Process(taskItem task.CICD) {
 		"NAMESPACE=" + taskItem.Namespace,
 		"APP=" + taskItem.Repo,
 		"PROJECT=" + url,
+		"KUBE_CONTEXT=" + "community", // todo: remove this spike
 		//	"RELEASE=" + taskItem.Version,
 	}
 
