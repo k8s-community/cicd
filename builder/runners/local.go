@@ -72,6 +72,7 @@ func (runner *Local) Process(taskItem task.CICD) {
 	userEnv := []string{
 		"NAMESPACE=" + taskItem.Namespace,
 		"APP=" + taskItem.Repo,
+		"PROJECT=" + url,
 		//	"RELEASE=" + taskItem.Version,
 	}
 
