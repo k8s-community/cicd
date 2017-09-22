@@ -74,7 +74,7 @@ func (runner *Local) Process(taskItem task.CICD) {
 		"APP=" + taskItem.Repo,
 		"PROJECT=" + url,
 		"KUBE_CONTEXT=" + "community", // todo: remove this spike
-		//	"RELEASE=" + taskItem.Version,
+		"RELEASE=" + taskItem.Version,
 	}
 
 	out, err = runCommand(logger, userEnv, dir, "make", "test")
