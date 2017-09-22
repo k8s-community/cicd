@@ -26,12 +26,12 @@ func NewLocal(log logrus.FieldLogger) *Local {
 
 // Process do CICD work: go get of repo, git checkout to given commit, make test and make deploy
 func (runner *Local) Process(taskItem task.CICD) {
-	logger := runner.log.WithFields(logrus.Fields{"source": taskItem.Prefix, "repo": taskItem.Repo, "commit": taskItem.Commit})
+	logger := runner.log.WithFields(logrus.Fields{"source": taskItem.Prefix, "namespace": taskItem.Namespace, "repo": taskItem.Repo, "commit": taskItem.Commit})
 
 	// TODO: it's good to use something like build.Default.GOPATH, but it doesn't work with daemon
 	gopath := os.Getenv("GOPATH")
 
-	url := fmt.Sprintf("%s/%s", taskItem.Prefix, taskItem.Repo)
+	url := fmt.Sprintf("%s/%s/%s", taskItem.Prefix, taskItem.Namespace, taskItem.Repo)
 	dir := fmt.Sprintf("%s/src/%s", gopath, url)
 
 	logger.Infof("Remove dir %s", dir)
