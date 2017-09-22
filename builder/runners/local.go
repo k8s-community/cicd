@@ -44,7 +44,7 @@ func (runner *Local) Process(taskItem task.CICD) {
 
 	var output string
 
-	out, err := runCommand(logger, []string{}, gopath, "go", "get", "-u", url+"/...")
+	out, err := runCommand(logger, []string{}, gopath, "go", "get", "-v", "-d", url+"/...")
 	output += out
 	processCommandResult(taskItem.ID, taskItem.Callback, output, err)
 	if err != nil {
