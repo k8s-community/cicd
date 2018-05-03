@@ -40,7 +40,7 @@ all: build
 
 .PHONY: vendor
 vendor: clean bootstrap
-	dep ensure
+	#dep ensure
 
 .PHONY: build
 build: vendor test certs
