@@ -38,12 +38,8 @@ BUILDTAGS=
 .PHONY: all
 all: build
 
-.PHONY: vendor
-vendor: clean bootstrap
-	#dep ensure
-
 .PHONY: build
-build: vendor test certs
+build: clean test certs
 	@echo "+ $@"
 	@CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -a -installsuffix cgo \
 		-ldflags "-s -w -X ${PROJECT}/pkg/version.RELEASE=${RELEASE} -X ${PROJECT}/pkg/version.COMMIT=${COMMIT} -X ${PROJECT}/pkg/version.REPO=${REPO_INFO}" \
@@ -108,33 +104,24 @@ endif
 deploy: push
 	helm upgrade ${CONTAINER_NAME} -f charts/${VALUES}.yaml charts --kube-context ${KUBE_CONTEXT} --namespace ${NAMESPACE} --version=${RELEASE} -i --wait
 
-GO_LIST_FILES=$(shell go list ${PROJECT}/... | grep -v vendor)
-
 .PHONY: fmt
 fmt:
 	@echo "+ $@"
-	@go list -f '{{if len .TestGoFiles}}"gofmt -s -l {{.Dir}}"{{end}}' ${GO_LIST_FILES} | xargs -L 1 sh -c
+
 
 .PHONY: lint
 lint: bootstrap
 	@echo "+ $@"
-	@go list -f '{{if len .TestGoFiles}}"golint -min_confidence=0.85 {{.Dir}}/..."{{end}}' ${GO_LIST_FILES} | xargs -L 1 sh -c
 
 .PHONY: vet
 vet:
 	@echo "+ $@"
-	@go vet ${GO_LIST_FILES}
+	@go vet ./...
 
 .PHONY: test
-test: vendor fmt lint vet
+test: clean fmt lint vet
 	@echo "+ $@"
-	@go test -v -race -cover -tags "$(BUILDTAGS) cgo" ${GO_LIST_FILES}
-
-.PHONY: cover
-cover:
-	@echo "+ $@"
-	@> coverage.txt
-	@go list -f '{{if len .TestGoFiles}}"go test -coverprofile={{.Dir}}/.coverprofile {{.ImportPath}} && cat {{.Dir}}/.coverprofile  >> coverage.txt"{{end}}' ${GO_LIST_FILES} | xargs -L 1 sh -c
+	@go test -v -race -tags "$(BUILDTAGS) cgo" ./...
 
 .PHONY: clean
 clean: stop rm
