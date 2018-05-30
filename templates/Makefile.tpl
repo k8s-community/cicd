@@ -4,7 +4,7 @@
 
 APP?=k8sapp
 PROJECT?=github.com/k8s-community/${APP}
-REGISTRY?=registry.k8s.community
+REGISTRY?=docker.io/k8sc
 CA_DIR?=certs
 
 # Use the 0.0.0 tag for testing, it shouldn't clobber any release builds
@@ -24,8 +24,8 @@ INFRASTRUCTURE?=stable
 KUBE_CONTEXT?=${INFRASTRUCTURE}
 VALUES?=values-${INFRASTRUCTURE}
 
-CONTAINER_IMAGE?=${REGISTRY}/${NAMESPACE}/${APP}
-CONTAINER_NAME?=${APP}-${NAMESPACE}
+CONTAINER_NAME?=${NAMESPACE}-${APP}
+CONTAINER_IMAGE?=${REGISTRY}/${CONTAINER_NAME}
 
 REPO_INFO=$(shell git config --get remote.origin.url)
 
