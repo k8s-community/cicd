@@ -9,12 +9,16 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"syscall"
+	"time"
 	"unicode/utf16"
 	"unsafe"
-)
 
-var ErrWindowsUnsupported = errors.New("Adding as a service failed. Download and place nssm.exe in the path to install this service as an service. NSSM url: https://nssm.cc/")
+	"golang.org/x/sys/windows/registry"
+	"golang.org/x/sys/windows/svc"
+	"golang.org/x/sys/windows/svc/mgr"
+)
 
 // windowsRecord - standard record (struct) for windows version of daemon package
 type windowsRecord struct {
@@ -31,7 +35,6 @@ func newDaemon(name, description string, dependencies []string) (Daemon, error) 
 // Install the service
 func (windows *windowsRecord) Install(args ...string) (string, error) {
 	installAction := "Install " + windows.description + ":"
-	adminAccessNecessary := "Administrator access is needed to install a service."
 
 	execp, err := execPath()
 
@@ -39,63 +42,160 @@ func (windows *windowsRecord) Install(args ...string) (string, error) {
 		return installAction + failed, err
 	}
 
-	cmd := exec.Command("nssm.exe", "install", windows.name, execp)
-	out, err := cmd.Output()
+	m, err := mgr.Connect()
 	if err != nil {
-		if len(out) > 0 {
-			fmt.Println(string(out))
-		} else {
-			fmt.Println("No output. Probably service already exists. Try uninstall first.")
-		}
 		return installAction + failed, err
 	}
-	if len(out) == 0 {
-		return adminAccessNecessary, errors.New(adminAccessNecessary)
+	defer m.Disconnect()
+
+	s, err := m.OpenService(windows.name)
+	if err == nil {
+		s.Close()
+		return installAction + failed, err
 	}
+
+	s, err = m.CreateService(windows.name, execp, mgr.Config{
+		DisplayName:  windows.name,
+		Description:  windows.description,
+		StartType:    mgr.StartAutomatic,
+		Dependencies: windows.dependencies,
+	}, args...)
+	if err != nil {
+		return installAction + failed, err
+	}
+	defer s.Close()
+
 	return installAction + " completed.", nil
 }
 
 // Remove the service
 func (windows *windowsRecord) Remove() (string, error) {
 	removeAction := "Removing " + windows.description + ":"
-	cmd := exec.Command("nssm.exe", "remove", windows.name, "confirm")
-	err := cmd.Run()
+
+	m, err := mgr.Connect()
 	if err != nil {
-		return removeAction + failed, err
+		return removeAction + failed, getWindowsError(err)
 	}
+	defer m.Disconnect()
+	s, err := m.OpenService(windows.name)
+	if err != nil {
+		return removeAction + failed, getWindowsError(err)
+	}
+	defer s.Close()
+	err = s.Delete()
+	if err != nil {
+		return removeAction + failed, getWindowsError(err)
+	}
+
 	return removeAction + " completed.", nil
 }
 
 // Start the service
 func (windows *windowsRecord) Start() (string, error) {
 	startAction := "Starting " + windows.description + ":"
-	cmd := exec.Command("nssm.exe", "start", windows.name)
-	err := cmd.Run()
+
+	m, err := mgr.Connect()
 	if err != nil {
-		return startAction + failed, err
+		return startAction + failed, getWindowsError(err)
 	}
+	defer m.Disconnect()
+	s, err := m.OpenService(windows.name)
+	if err != nil {
+		return startAction + failed, getWindowsError(err)
+	}
+	defer s.Close()
+	if err = s.Start(); err != nil {
+		return startAction + failed, getWindowsError(err)
+	}
+
 	return startAction + " completed.", nil
 }
 
 // Stop the service
 func (windows *windowsRecord) Stop() (string, error) {
 	stopAction := "Stopping " + windows.description + ":"
-	cmd := exec.Command("nssm.exe", "stop", windows.name)
-	err := cmd.Run()
+
+	m, err := mgr.Connect()
 	if err != nil {
-		return stopAction + failed, err
+		return stopAction + failed, getWindowsError(err)
 	}
+	defer m.Disconnect()
+	s, err := m.OpenService(windows.name)
+	if err != nil {
+		return stopAction + failed, getWindowsError(err)
+	}
+	defer s.Close()
+	if err := stopAndWait(s); err != nil {
+		return stopAction + failed, getWindowsError(err)
+	}
+
 	return stopAction + " completed.", nil
+}
+
+func stopAndWait(s *mgr.Service) error {
+	// First stop the service. Then wait for the service to
+	// actually stop before starting it.
+	status, err := s.Control(svc.Stop)
+	if err != nil {
+		return err
+	}
+
+	timeDuration := time.Millisecond * 50
+
+	timeout := time.After(getStopTimeout() + (timeDuration * 2))
+	tick := time.NewTicker(timeDuration)
+	defer tick.Stop()
+
+	for status.State != svc.Stopped {
+		select {
+		case <-tick.C:
+			status, err = s.Query()
+			if err != nil {
+				return err
+			}
+		case <-timeout:
+			break
+		}
+	}
+	return nil
+}
+
+func getStopTimeout() time.Duration {
+	// For default and paths see https://support.microsoft.com/en-us/kb/146092
+	defaultTimeout := time.Millisecond * 20000
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Control`, registry.READ)
+	if err != nil {
+		return defaultTimeout
+	}
+	sv, _, err := key.GetStringValue("WaitToKillServiceTimeout")
+	if err != nil {
+		return defaultTimeout
+	}
+	v, err := strconv.Atoi(sv)
+	if err != nil {
+		return defaultTimeout
+	}
+	return time.Millisecond * time.Duration(v)
 }
 
 // Status - Get service status
 func (windows *windowsRecord) Status() (string, error) {
-	cmd := exec.Command("nssm.exe", "status", windows.name)
-	out, err := cmd.Output()
+	m, err := mgr.Connect()
 	if err != nil {
-		return "Getting status:" + failed, err
+		return "Getting status:" + failed, getWindowsError(err)
 	}
-	return "Status: " + string(out), nil
+	defer m.Disconnect()
+	s, err := m.OpenService(windows.name)
+	if err != nil {
+		return "Getting status:" + failed, getWindowsError(err)
+	}
+	defer s.Close()
+	status, err := s.Query()
+	if err != nil {
+		return "Getting status:" + failed, getWindowsError(err)
+	}
+
+	return "Status: " + getWindowsServiceStateFromUint32(status.State), nil
 }
 
 // Get executable path
@@ -114,4 +214,107 @@ func execPath() (string, error) {
 		return "", e1
 	}
 	return string(utf16.Decode(b[0:n])), nil
+}
+
+// Get windows error
+func getWindowsError(inputError error) error {
+	if exiterr, ok := inputError.(*exec.ExitError); ok {
+		if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+			if sysErr, ok := WinErrCode[status.ExitStatus()]; ok {
+				return errors.New(fmt.Sprintf("\n %s: %s \n %s", sysErr.Title, sysErr.Description, sysErr.Action))
+			}
+		}
+	}
+
+	return inputError
+}
+
+// Get windows service state
+func getWindowsServiceStateFromUint32(state svc.State) string {
+	switch state {
+	case svc.Stopped:
+		return "SERVICE_STOPPED"
+	case svc.StartPending:
+		return "SERVICE_START_PENDING"
+	case svc.StopPending:
+		return "SERVICE_STOP_PENDING"
+	case svc.Running:
+		return "SERVICE_RUNNING"
+	case svc.ContinuePending:
+		return "SERVICE_CONTINUE_PENDING"
+	case svc.PausePending:
+		return "SERVICE_PAUSE_PENDING"
+	case svc.Paused:
+		return "SERVICE_PAUSED"
+	}
+	return "SERVICE_UNKNOWN"
+}
+
+type serviceHandler struct {
+	executable Executable
+}
+
+func (sh *serviceHandler) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
+	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown | svc.AcceptPauseAndContinue
+	changes <- svc.Status{State: svc.StartPending}
+
+	fasttick := time.Tick(500 * time.Millisecond)
+	slowtick := time.Tick(2 * time.Second)
+	tick := fasttick
+
+	sh.executable.Start()
+	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+
+loop:
+	for {
+		select {
+		case <-tick:
+			break
+		case c := <-r:
+			switch c.Cmd {
+			case svc.Interrogate:
+				changes <- c.CurrentStatus
+				// Testing deadlock from https://code.google.com/p/winsvc/issues/detail?id=4
+				time.Sleep(100 * time.Millisecond)
+				changes <- c.CurrentStatus
+			case svc.Stop, svc.Shutdown:
+				changes <- svc.Status{State: svc.StopPending}
+				sh.executable.Stop()
+				break loop
+			case svc.Pause:
+				changes <- svc.Status{State: svc.Paused, Accepts: cmdsAccepted}
+				tick = slowtick
+			case svc.Continue:
+				changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+				tick = fasttick
+			default:
+				continue loop
+			}
+		}
+	}
+	return
+}
+
+func (windows *windowsRecord) Run(e Executable) (string, error) {
+	runAction := "Running " + windows.description + ":"
+
+	interactive, err := svc.IsAnInteractiveSession()
+	if err != nil {
+		return runAction + failed, getWindowsError(err)
+	}
+	if !interactive {
+		// service called from windows service manager
+		// use API provided by golang.org/x/sys/windows
+		err = svc.Run(windows.name, &serviceHandler{
+			executable: e,
+		})
+		if err != nil {
+			return runAction + failed, getWindowsError(err)
+		}
+	} else {
+		// otherwise, service should be called from terminal session
+		e.Run()
+	}
+
+	return runAction + " completed.", nil
 }
