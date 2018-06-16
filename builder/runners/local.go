@@ -75,6 +75,7 @@ func (runner *Local) Process(taskItem task.CICD) {
 		"PROJECT=" + url,
 		"KUBE_CONTEXT=" + "cdays", // todo: remove this spike
 		"RELEASE=" + taskItem.Version,
+		"REGISTRY=" + "gcr.io/containers-206912", // todo: remove this spike
 	}
 
 	out, err = runCommand(logger, userEnv, dir, "make", "test")
