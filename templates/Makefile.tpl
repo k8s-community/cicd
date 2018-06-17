@@ -28,7 +28,7 @@ BUILDTAGS=
 all: build
 
 .PHONY: build
-build: clean test certs
+build: clean test
 	@echo "+ $@"
 	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} \
 	go build \
