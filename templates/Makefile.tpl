@@ -28,7 +28,7 @@ BUILDTAGS=
 all: build
 
 .PHONY: build
-build: clean test
+build: clean test certs
 	@echo "+ $@"
 	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} \
 	go build \
@@ -37,6 +37,17 @@ build: clean test
 		-X ${PROJECT}/version.BuildTime=${BUILD_TIME}" \
 		-o ./bin/${GOOS}-${GOARCH}/${APP} ${PROJECT}/${BUILD_PATH}
 	docker build --pull -t $(CONTAINER_IMAGE):$(RELEASE) .
+
+.PHONY: certs
+certs:
+ifeq ("$(wildcard $(CA_DIR)/ca-certificates.crt)","")
+	@echo "+ $@"
+	@docker run --name ${CONTAINER_NAME}-certs -d alpine:edge sh -c "apk --update upgrade && apk add ca-certificates && update-ca-certificates"
+	@docker wait ${CONTAINER_NAME}-certs
+	@mkdir -p ${CA_DIR}
+	@docker cp ${CONTAINER_NAME}-certs:/etc/ssl/certs/ca-certificates.crt ${CA_DIR}
+	@docker rm -f ${CONTAINER_NAME}-certs
+endif
 
 .PHONY: push
 push: build
