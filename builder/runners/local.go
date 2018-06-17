@@ -10,6 +10,8 @@ import (
 	"github.com/k8s-community/cicd"
 	"github.com/k8s-community/cicd/builder/task"
 	ghIntegr "github.com/k8s-community/github-integration/client"
+	"bufio"
+	"io"
 )
 
 // Local represent simple local builder (it runs tasks on current environment)
@@ -58,6 +60,17 @@ func (runner *Local) Process(taskItem task.CICD) {
 		return
 	}
 
+	buildPath, err := parseOriginalMakefile("./Makefile")
+	if err != nil {
+		processCommandResult(
+			taskItem.ID, taskItem.Callback, "", fmt.Errorf("couldn't open the original Makefile"),
+		)
+		return
+	}
+	if len(buildPath) == 0 {
+		buildPath = "cmd"
+	}
+
 	// Prepare typical Makefile by template from k8s-community/k8sapp
 	out, err = runCommand(
 		logger, []string{}, dir, "cp",
@@ -73,6 +86,7 @@ func (runner *Local) Process(taskItem task.CICD) {
 		"NAMESPACE=" + taskItem.Namespace,
 		"APP=" + taskItem.Repo,
 		"PROJECT=" + url,
+		"BUILD_PATH=" + buildPath,
 		"KUBE_CONTEXT=" + "cdays", // todo: remove this spike
 		"RELEASE=" + taskItem.Version,
 		"REGISTRY=" + "gcr.io/containers-206912", // todo: remove this spike
@@ -132,4 +146,29 @@ func processCommandResult(taskID string, callback task.Callback, output string, 
 	} else {
 		callback(taskID, ghIntegr.StatePending, output)
 	}
+}
+
+func parseOriginalMakefile(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	var buildPath string
+	reader := bufio.NewReader(file)
+	for {
+		line, _, err := reader.ReadLine()
+
+		if err == io.EOF {
+			break
+		}
+
+		if strings.HasPrefix(string(line), "BUILD_PATH?=") {
+			buildPath = strings.TrimPrefix(string(line), "BUILD_PATH?=")
+			break
+		}
+	}
+	
+	return buildPath, nil
 }

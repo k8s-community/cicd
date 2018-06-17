@@ -4,6 +4,7 @@
 
 APP?=k8sapp
 PROJECT?=github.com/k8s-community/${APP}
+BUILD_PATH?=cmd/k8sapp
 REGISTRY?=gcr.io/containers-206912
 CA_DIR?=certs
 
@@ -43,7 +44,7 @@ build: clean test certs
 	@echo "+ $@"
 	@CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -a -installsuffix cgo \
 		-ldflags "-s -w -X ${PROJECT}/pkg/version.RELEASE=${RELEASE} -X ${PROJECT}/pkg/version.COMMIT=${COMMIT} -X ${PROJECT}/pkg/version.REPO=${REPO_INFO}" \
-		-o bin/${GOOS}-${GOARCH}/${APP} ${PROJECT}/cmd
+		-o bin/${GOOS}-${GOARCH}/${APP} ${PROJECT}/${BUILD_PATH}
 	docker build --pull -t $(CONTAINER_IMAGE):$(RELEASE) .
 
 .PHONY: certs
