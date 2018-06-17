@@ -12,7 +12,7 @@ GOARCH?=amd64
 NAMESPACE?=k8s-community
 
 # Directory to store generated CA
-CA_DIR?=cert
+CA_DIR?=certs
 
 # Infrastructure (dev, stable, test ...) and kube-context for helm
 INFRASTRUCTURE?=stable
