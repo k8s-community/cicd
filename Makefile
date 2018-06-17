@@ -5,7 +5,7 @@ BUILDTAGS=
 # Use the 0.0.0 tag for testing, it shouldn't clobber any release builds
 APP=cicd
 USERSPACE?=k8s-community
-RELEASE?=0.4.4
+RELEASE?=0.5.0
 PROJECT?=github.com/${USERSPACE}/${APP}
 GOOS?=linux
 
@@ -20,11 +20,7 @@ ifndef COMMIT
   COMMIT := git-$(shell git rev-parse --short HEAD)
 endif
 
-vendor: clean
-	go get -u github.com/Masterminds/glide \
-	&& glide install
-
-build: vendor
+build:
 	cd service \
 	&& CGO_ENABLED=0 GOOS=${GOOS} go build -a -installsuffix cgo \
 		-ldflags "-s -w -X ${PROJECT}/version.RELEASE=${RELEASE} -X ${PROJECT}/version.COMMIT=${COMMIT} -X ${PROJECT}/version.REPO=${REPO_INFO}" \
@@ -56,7 +52,7 @@ vet:
 	@echo "+ $@"
 	@go vet $(shell go list ${PROJECT}/... | grep -v vendor)
 
-test: vendor utils fmt lint vet
+test: utils fmt lint vet
 	@echo "+ $@"
 	@go test -v -race -tags "$(BUILDTAGS) cgo" $(shell go list ${PROJECT}/... | grep -v vendor)
 

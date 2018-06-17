@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package daemon 0.9.1 for use with Go (golang) services.
+Package daemon 0.11.0 for use with Go (golang) services.
 
 Package daemon provides primitives for daemonization of golang services.
 This package is not provide implementation of user daemon,
@@ -174,6 +174,19 @@ type Daemon interface {
 
 	// Status - check the service status
 	Status() (string, error)
+
+	// Run - run executable service
+	Run(e Executable) (string, error)
+}
+
+// Executable interface defines controlling methods of executable service
+type Executable interface {
+	// Start - non-blocking start service
+	Start()
+	// Stop - non-blocking stop service
+	Stop()
+	// Run - blocking run service
+	Run()
 }
 
 // New - Create a new daemon
@@ -183,9 +196,4 @@ type Daemon interface {
 // description: any explanation, what is the service, its purpose
 func New(name, description string, dependencies ...string) (Daemon, error) {
 	return newDaemon(strings.Join(strings.Fields(name), "_"), description, dependencies)
-}
-
-// ExecPath tries to get executable path
-func ExecPath() (string, error) {
-	return execPath()
 }
