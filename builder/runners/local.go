@@ -62,6 +62,7 @@ func (runner *Local) Process(taskItem task.CICD) {
 
 	buildPath, err := parseOriginalMakefile("./Makefile")
 	if err != nil {
+		logger.Errorf("Makerfile reading failed: %s", err)
 		processCommandResult(
 			taskItem.ID, taskItem.Callback, "", fmt.Errorf("couldn't open the original Makefile"),
 		)
