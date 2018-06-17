@@ -56,5 +56,5 @@ test: clean
 	go test -v -race ./...
 
 .PHONY: clean
-clean: stop rm
+clean:
 	@rm -f bin/${GOOS}-${GOARCH}/${APP}
