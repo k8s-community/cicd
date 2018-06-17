@@ -10,8 +10,8 @@
 [[projects]]
   name = "github.com/k8s-community/github-integration"
   packages = ["client"]
-  revision = "a4d05800f5c3d3524adb685a2efc892576bb0751"
-  version = "0.6.4"
+  revision = "db4025e8a7e799584ec145f0ea9cc9f4684f3c44"
+  version = "0.8.0"
 
 [[projects]]
   name = "github.com/octago/sflags"
@@ -58,6 +58,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f4f4363caac3c028d3527157f386c55296f716979f33de4ddd8a1cc92b1ef404"
+  inputs-digest = "9b7a13c470fb59626166ccb3c17a8e358a636a34347841f5681d88638279a5ff"
   solver-name = "gps-cdcl"
   solver-version = 1
