@@ -37,7 +37,7 @@ type Config struct {
 func main() {
 	// To be able to work under daemon we need to set some environment...
 	os.Setenv("GOPATH", "/root/go")
-	os.Setenv("PATH", "$PATH:/bin:/usr/bin:/usr/local/bin:/usr/local/go/bin:/root/go/bin")
+	os.Setenv("PATH", "$PATH:/bin:/snap/bin/:/usr/bin:/usr/local/bin:/usr/local/go/bin:/root/go/bin")
 	os.Setenv("HOME", "/root")
 
 	log := logrus.New()
