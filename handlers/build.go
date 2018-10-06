@@ -85,9 +85,9 @@ func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 			Repository:  req.Repository,
 			CommitHash:  req.CommitHash,
 			State:       state,
-			BuildURL:    "https://k8s.community/builds/" + requestID, // TODO: fix it!
-			Description: "Waiting for " + req.Task,                   // TODO: less than 120 symbols
-			Context:     "k8s-community/" + cicd.TaskTest,            // TODO: fix it!
+			BuildURL:    "https://ui.k8s.community/builds/" + requestID, // TODO: fix it!
+			Description: "Waiting for " + req.Task,                      // TODO: less than 120 symbols
+			Context:     "k8s-community/" + cicd.TaskTest,               // TODO: fix it!
 		}
 		err := b.githubIntegrationClient.Build.BuildCallback(callbackData)
 		if err != nil {

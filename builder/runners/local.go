@@ -6,12 +6,13 @@ import (
 	"os/exec"
 	"strings"
 
+	"bufio"
+	"io"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/k8s-community/cicd"
 	"github.com/k8s-community/cicd/builder/task"
 	ghIntegr "github.com/k8s-community/github-integration/client"
-	"bufio"
-	"io"
 )
 
 // Local represent simple local builder (it runs tasks on current environment)
@@ -88,9 +89,9 @@ func (runner *Local) Process(taskItem task.CICD) {
 		"APP=" + taskItem.Repo,
 		"PROJECT=" + url,
 		"BUILD_PATH=" + buildPath,
-		"KUBE_CONTEXT=" + "cdays", // todo: remove this spike
+		"KUBE_CONTEXT=" + "gke_sofia-218312_europe-west1-b_sofia", // todo: remove this spike
 		"RELEASE=" + taskItem.Version,
-		"REGISTRY=" + "gcr.io/containers-206912", // todo: remove this spike
+		"REGISTRY=" + "gcr.io/sofia-218312", // todo: remove this spike
 	}
 
 	out, err = runCommand(logger, userEnv, dir, "make", "test")
@@ -170,6 +171,6 @@ func parseOriginalMakefile(path string) (string, error) {
 			break
 		}
 	}
-	
+
 	return buildPath, nil
 }
