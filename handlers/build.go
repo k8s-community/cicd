@@ -79,6 +79,8 @@ func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 	namespace := strings.ToLower(req.Username)
 
 	callback := func(taskID string, state string, description string) {
+		b.log.Info("\n\nSending a callback...\n")
+
 		// TODO: send result of processing to integration service too!
 		callbackData := ghIntegr.BuildCallback{
 			Username:    req.Username,
