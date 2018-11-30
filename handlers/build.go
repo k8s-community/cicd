@@ -93,7 +93,24 @@ func (b *Build) processBuild(req *cicd.BuildRequest, requestID string) {
 		}
 		err := b.githubIntegrationClient.Build.BuildCallback(callbackData)
 		if err != nil {
-			b.log.Error(err)
+			b.log.Errorf("couldn't send github status: '%v'", err)
+		}
+
+		if state == ghIntegr.StatePending {
+			return
+		}
+
+		resultsData := &ghIntegr.BuildResults{
+			UUID: requestID,
+			Username: req.Username,
+			Repository: req.Repository,
+			CommitHash: req.CommitHash,
+			Passed: state == ghIntegr.StateSuccess,
+			Log: description,
+		}
+		err = b.githubIntegrationClient.Build.BuildResults(resultsData)
+		if err != nil {
+			b.log.Errorf("couldn't save build info: '%v'", err)
 		}
 	}
 
