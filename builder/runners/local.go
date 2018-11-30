@@ -61,7 +61,7 @@ func (runner *Local) Process(taskItem task.CICD) {
 		return
 	}
 
-	buildPath, err := parseOriginalMakefile(gopath + "/src/" + url + "/Makefile")
+	buildPath, version, err := parseOriginalMakefile(gopath + "/src/" + url + "/Makefile")
 	if err != nil {
 		logger.Errorf("Makefile reading failed: %s", err)
 		processCommandResult(
@@ -84,13 +84,17 @@ func (runner *Local) Process(taskItem task.CICD) {
 		return
 	}
 
+	if len(taskItem.Version) > 0 {
+		version = taskItem.Version
+	}
+
 	userEnv := []string{
 		"NAMESPACE=" + taskItem.Namespace,
 		"APP=" + taskItem.Repo,
 		"PROJECT=" + url,
 		"BUILD_PATH=" + buildPath,
 		"KUBE_CONTEXT=" + "gke_sofia-218312_europe-west1-b_sofia", // todo: remove this spike
-		"RELEASE=" + taskItem.Version,
+		"RELEASE=" + version,
 		"REGISTRY=" + "gcr.io/sofia-218312", // todo: remove this spike
 	}
 
@@ -150,14 +154,15 @@ func processCommandResult(taskID string, callback task.Callback, output string, 
 	}
 }
 
-func parseOriginalMakefile(path string) (string, error) {
+func parseOriginalMakefile(path string) (string, string, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer file.Close()
 
 	var buildPath string
+	var version string
 	reader := bufio.NewReader(file)
 	for {
 		line, _, err := reader.ReadLine()
@@ -168,9 +173,16 @@ func parseOriginalMakefile(path string) (string, error) {
 
 		if strings.HasPrefix(string(line), "BUILD_PATH?=") {
 			buildPath = strings.TrimPrefix(string(line), "BUILD_PATH?=")
+		}
+
+		if strings.HasPrefix(string(line), "RELEASE?=") {
+			version = strings.TrimPrefix(string(line), "RELEASE?=")
+		}
+
+		if len(buildPath) > 0 && len(version) > 0 {
 			break
 		}
 	}
 
-	return buildPath, nil
+	return buildPath, version, nil
 }
