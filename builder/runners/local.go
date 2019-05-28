@@ -93,9 +93,9 @@ func (runner *Local) Process(taskItem task.CICD) {
 		"APP=" + taskItem.Repo,
 		"PROJECT=" + url,
 		"BUILD_PATH=" + buildPath,
-		"KUBE_CONTEXT=" + "gke_kubnsk-223707_europe-west1-b_nsk", // todo: remove this spike
+		"KUBE_CONTEXT=" + "gke_tenerife-241408_europe-west1-b_tenerife", // todo: remove this spike
 		"RELEASE=" + version,
-		"REGISTRY=" + "gcr.io/kubnsk-223707", // todo: remove this spike
+		"REGISTRY=" + "eu.gcr.io/tenerife-241408", // todo: remove this spike
 	}
 
 	out, err = runCommand(logger, userEnv, dir, "make", "test")
